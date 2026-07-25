@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
+import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import '../../../core/models/file_item.dart';
 import '../bloc/desktop_bloc.dart';
 import '../bloc/desktop_event.dart';
@@ -40,9 +42,19 @@ class DesktopIcon extends StatelessWidget {
         // Stop the tap from bubbling to the desktop's clear-selection handler.
         context.read<DesktopBloc>().add(DesktopIconSelected(item.id));
       },
-      // Double-click/tap to open — actual "open a window" behavior lands in
-      // Phase 7 once WindowBloc exists. For now this is a no-op placeholder.
-      onDoubleTap: () {},
+      onDoubleTap: () {
+        // Dummy content for now — Phase 10's PreviewBloc replaces this
+        // contentBuilder with a real file viewer keyed off item.type.
+        context.read<WindowBloc>().add(
+          WindowOpened(
+            id: item.id,
+            title: item.name,
+            contentBuilder: (context) => Center(
+              child: Text('Window body placeholder for "${item.name}"'),
+            ),
+          ),
+        );
+      },
       child: Container(
         width: 88,
         padding: const EdgeInsets.all(8),

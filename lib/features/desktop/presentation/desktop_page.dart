@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:virtual_desktop/core/models/file_item.dart';
+import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
+import 'package:virtual_desktop/features/windows/presentation/wndows_overlay.dart';
 import '../../../core/di/injector.dart';
-import '../../../core/repositories/file_system_repository.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import '../../authentication/bloc/auth_event.dart';
+import '../../windows/bloc/window_bloc.dart';
 import '../bloc/desktop_bloc.dart';
 import '../bloc/desktop_event.dart';
 import '../bloc/desktop_state.dart';
@@ -32,10 +34,15 @@ class DesktopPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) =>
-          DesktopBloc(fileSystemRepository: getIt<FileSystemRepository>())
-            ..add(const DesktopFolderWatchRequested(null)),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) =>
+              DesktopBloc(fileSystemRepository: getIt<FileSystemRepository>())
+                ..add(const DesktopFolderWatchRequested(null)),
+        ),
+        BlocProvider(create: (_) => WindowBloc()),
+      ],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Desktop'),
@@ -54,31 +61,33 @@ class DesktopPage extends StatelessWidget {
         body: BlocBuilder<DesktopBloc, DesktopState>(
           builder: (context, state) {
             return GestureDetector(
-              // Tapping empty desktop space clears selection.
               onTap: () => context.read<DesktopBloc>().add(
                 const DesktopSelectionCleared(),
               ),
-              child: Container(
-                width: double.infinity,
-                height: double.infinity,
-                // Placeholder wallpaper — swap for Image.asset once real
-                // wallpaper assets exist (Phase 11 wires up SettingsBloc).
-                color: const Color(0xFF1E2A38),
-                child: state.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          for (final item in state.items)
-                            DesktopIcon(
-                              item: item,
-                              isSelected: state.selectedItemIds.contains(
-                                item.id,
-                              ),
-                            ),
-                        ],
-                      ),
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: const Color(0xFF1E2A38),
+                    child: state.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : Wrap(
+                            spacing: 16,
+                            runSpacing: 16,
+                            children: [
+                              for (final item in state.items)
+                                DesktopIcon(
+                                  item: item,
+                                  isSelected: state.selectedItemIds.contains(
+                                    item.id,
+                                  ),
+                                ),
+                            ],
+                          ),
+                  ),
+                  const WindowsOverlay(),
+                ],
               ),
             );
           },

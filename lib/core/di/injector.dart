@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:virtual_desktop/core/providers/firebase/firebase_auth_repository.dart';
+import 'package:virtual_desktop/core/providers/firebase/firestore_file_system_repository.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/file_system_repository.dart';
 import '../services/storage_service.dart';
@@ -13,6 +14,8 @@ void setupDependencies() {
   getIt.registerLazySingleton<AuthRepository>(() => FirebaseAuthRepository());
   getIt.registerLazySingleton<StorageService>(() => FakeStorageService());
   getIt.registerLazySingleton<FileSystemRepository>(
-    () => FakeFileSystemRepository(),
+    () => FirestoreFileSystemRepository(
+      getCurrentOwnerId: () => getIt<AuthRepository>().currentUser!.uid,
+    ),
   );
 }

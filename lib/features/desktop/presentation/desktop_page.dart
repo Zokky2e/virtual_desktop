@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:virtual_desktop/core/models/file_item.dart';
+import 'package:virtual_desktop/core/repositories/auth_repository.dart';
 import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
 import 'package:virtual_desktop/features/windows/presentation/wndows_overlay.dart';
 import '../../../core/di/injector.dart';
@@ -15,20 +16,18 @@ import 'desktop_icon.dart';
 class DesktopPage extends StatelessWidget {
   const DesktopPage({super.key});
 
-  void addTemporaryIcons() {
-    // TEMPORARY — remove once Phase 8 wires real folder creation UI.
+  void addNewFolder(BuildContext context) {
+    final uid = getIt<AuthRepository>().currentUser!.uid;
+    // context.read<DesktopBloc>().add(
+    //   // DesktopBloc doesn't have a "create" event yet — call the
+    //   // repository directly for now. Wiring this through a proper
+    //   // DesktopFolderCreateRequested event is a good Phase 12 cleanup
+    //   // once context menus replace this button anyway.
+    // );
     getIt<FileSystemRepository>().createFolder(
-      name: 'Test Folder',
+      name: 'New Folder',
       parentFolderId: null,
-      ownerId: 'fake-uid',
-    );
-    getIt<FileSystemRepository>().createFile(
-      name: 'Test File',
-      parentFolderId: null,
-      ownerId: 'fake-uid',
-      type: FileItemType.image,
-      storageKey: "fake-storage-key",
-      size: 32,
+      ownerId: uid,
     );
   }
 
@@ -48,8 +47,8 @@ class DesktopPage extends StatelessWidget {
           title: const Text('Desktop'),
           actions: [
             IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => addTemporaryIcons(),
+              icon: const Icon(Icons.create_new_folder),
+              onPressed: () => addNewFolder(context),
             ),
             IconButton(
               icon: const Icon(Icons.logout),

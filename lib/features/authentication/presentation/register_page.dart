@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:virtual_desktop/app/router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -14,11 +16,13 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -48,23 +52,21 @@ class _RegisterPageState extends State<RegisterPage> {
                       controller: _emailController,
                       decoration: const InputDecoration(labelText: 'Email'),
                       keyboardType: TextInputType.emailAddress,
+                      onSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordFocusNode);
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
                       decoration: const InputDecoration(labelText: 'Password'),
                       obscureText: true,
+                      onSubmitted: (_) => isLoading ? null : _submit(),
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: isLoading
-                          ? null
-                          : () => context.read<AuthBloc>().add(
-                              AuthSignUpRequested(
-                                email: _emailController.text.trim(),
-                                password: _passwordController.text,
-                              ),
-                            ),
+                      onPressed: isLoading ? null : () => _submit(),
                       child: isLoading
                           ? const SizedBox(
                               height: 20,
@@ -73,12 +75,27 @@ class _RegisterPageState extends State<RegisterPage> {
                             )
                           : const Text('Create Account'),
                     ),
+                    TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () => context.go(AppRoutes.login),
+                      child: const Text("Have an account? Login instead."),
+                    ),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _submit() {
+    context.read<AuthBloc>().add(
+      AuthSignUpRequested(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       ),
     );
   }

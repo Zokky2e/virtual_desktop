@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:virtual_desktop/app/router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -15,11 +16,13 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -49,12 +52,17 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _emailController,
                       decoration: const InputDecoration(labelText: 'Email'),
                       keyboardType: TextInputType.emailAddress,
+                      onSubmitted: (_) {
+                        FocusScope.of(context).requestFocus(_passwordFocusNode);
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
                       decoration: const InputDecoration(labelText: 'Password'),
                       obscureText: true,
+                      onSubmitted: (_) => isLoading ? null : _submit(),
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
@@ -70,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
                     TextButton(
                       onPressed: isLoading
                           ? null
-                          : () => context.push('/register'),
+                          : () => context.go(AppRoutes.register),
                       child: const Text("Don't have an account? Register"),
                     ),
                   ],

@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:virtual_desktop/app/app.dart';
+import 'package:virtual_desktop/core/di/injector.dart';
 
 Future<void> main() async {
   await dotenv.load(fileName: ".env");
@@ -16,5 +17,6 @@ Future<void> main() async {
       measurementId: dotenv.env['FIREBASE_MEASUREMENT_ID'],
     ),
   );
+  setupDependencies();
   runApp(const App());
 }

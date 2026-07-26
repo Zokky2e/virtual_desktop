@@ -2,13 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
+import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
 import '../../../core/models/file_item.dart';
 import '../bloc/desktop_bloc.dart';
 import '../bloc/desktop_event.dart';
 
 class DesktopIcon extends StatelessWidget {
-  const DesktopIcon({super.key, required this.item, required this.isSelected});
+  const DesktopIcon({
+    super.key,
+    required this.item,
+    required this.isSelected,
+    this.onFolderDoubleTap,
+  });
 
+  /// When non-null, double-tapping a folder calls this instead of opening
+  /// a brand-new window — used when this icon is rendered *inside* an
+  /// already-open folder window (see FolderWindowContent), so navigating
+  /// deeper reuses that window rather than spawning another one.
+  final VoidCallback? onFolderDoubleTap;
   final FileItem item;
   final bool isSelected;
 
@@ -35,25 +46,45 @@ class DesktopIcon extends StatelessWidget {
     }
   }
 
+  void _handleDoubleTap(BuildContext context) {
+    if (item.isFolder) {
+      if (onFolderDoubleTap != null) {
+        onFolderDoubleTap!();
+        return;
+      }
+      // Opened from the desktop (root) — open a new folder-browsing window.
+      context.read<WindowBloc>().add(
+        WindowOpened(
+          id: item.id,
+          title: item.name,
+          contentBuilder: (context) =>
+              FolderWindowContent(windowId: item.id, rootFolder: item),
+        ),
+      );
+      return;
+    }
+
+    // Non-folder — placeholder until Phase 10's PreviewBloc replaces this.
+    context.read<WindowBloc>().add(
+      WindowOpened(
+        id: item.id,
+        title: item.name,
+        contentBuilder: (context) =>
+            Center(child: Text('Preview placeholder for "${item.name}"')),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
         // Stop the tap from bubbling to the desktop's clear-selection handler.
-        context.read<DesktopBloc>().add(DesktopIconSelected(item.id));
+        final desktopBloc = context.read<DesktopBloc?>();
+        desktopBloc?.add(DesktopIconSelected(item.id));
       },
       onDoubleTap: () {
-        // Dummy content for now — Phase 10's PreviewBloc replaces this
-        // contentBuilder with a real file viewer keyed off item.type.
-        context.read<WindowBloc>().add(
-          WindowOpened(
-            id: item.id,
-            title: item.name,
-            contentBuilder: (context) => Center(
-              child: Text('Window body placeholder for "${item.name}"'),
-            ),
-          ),
-        );
+        _handleDoubleTap(context);
       },
       child: Container(
         width: 88,

@@ -58,6 +58,7 @@ class _TitleBar extends StatelessWidget {
         color: isFocused ? Colors.deepPurple : Colors.grey.shade700,
         child: Row(
           children: [
+            if (window.leadingBuilder != null) window.leadingBuilder!(context),
             Expanded(
               child: Text(
                 window.title,

@@ -65,3 +65,21 @@ class WindowMinimizeToggled extends WindowEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class WindowTitleChanged extends WindowEvent {
+  const WindowTitleChanged(this.id, this.newTitle);
+  final String id;
+  final String newTitle;
+  @override
+  List<Object?> get props => [id, newTitle];
+}
+
+class WindowLeadingChanged extends WindowEvent {
+  const WindowLeadingChanged(this.id, this.leadingBuilder);
+  final String id;
+
+  /// Pass null to remove the leading widget entirely.
+  final WidgetBuilder? leadingBuilder;
+  @override
+  List<Object?> get props => [id];
+}

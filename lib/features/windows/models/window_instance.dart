@@ -10,6 +10,7 @@ class WindowInstance extends Equatable {
     required this.zIndex,
     required this.contentBuilder,
     this.isMinimized = false,
+    this.leadingBuilder,
   });
 
   final String id;
@@ -23,12 +24,18 @@ class WindowInstance extends Equatable {
   /// but for now it's whatever widget the caller wants rendered.
   final WidgetBuilder contentBuilder;
 
+  /// Optional widget rendered before the title text in the title bar —
+  /// used for the folder-navigation back arrow. Null means no leading widget.
+  final WidgetBuilder? leadingBuilder;
+
   WindowInstance copyWith({
     String? title,
     Offset? position,
     Size? size,
     int? zIndex,
     bool? isMinimized,
+    WidgetBuilder? leadingBuilder,
+    bool clearLeadingBuilder = false,
   }) {
     return WindowInstance(
       id: id,
@@ -38,11 +45,14 @@ class WindowInstance extends Equatable {
       zIndex: zIndex ?? this.zIndex,
       isMinimized: isMinimized ?? this.isMinimized,
       contentBuilder: contentBuilder,
+      leadingBuilder: clearLeadingBuilder
+          ? null
+          : (leadingBuilder ?? this.leadingBuilder),
     );
   }
 
   @override
   List<Object?> get props => [id, title, position, size, zIndex, isMinimized];
-  // contentBuilder is deliberately excluded — it's a function reference,
+  // contentBuilder and leadingBuilder are deliberately excluded — it's a function reference,
   // Equatable would only ever compare it by identity anyway.
 }

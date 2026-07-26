@@ -12,6 +12,8 @@ class WindowBloc extends Bloc<WindowEvent, WindowManagerState> {
     on<WindowMoved>(_onMoved);
     on<WindowResized>(_onResized);
     on<WindowMinimizeToggled>(_onMinimizeToggled);
+    on<WindowTitleChanged>(_onTitleChanged);
+    on<WindowLeadingChanged>(_onLeadingChanged);
   }
 
   static const _defaultSize = Size(480, 360);
@@ -102,6 +104,31 @@ class WindowBloc extends Bloc<WindowEvent, WindowManagerState> {
     final updated = [...state.windows];
     updated[index] = updated[index].copyWith(
       isMinimized: !updated[index].isMinimized,
+    );
+    emit(state.copyWith(windows: updated));
+  }
+
+  void _onTitleChanged(
+    WindowTitleChanged event,
+    Emitter<WindowManagerState> emit,
+  ) {
+    final index = state.windows.indexWhere((w) => w.id == event.id);
+    if (index == -1) return;
+    final updated = [...state.windows];
+    updated[index] = updated[index].copyWith(title: event.newTitle);
+    emit(state.copyWith(windows: updated));
+  }
+
+  void _onLeadingChanged(
+    WindowLeadingChanged event,
+    Emitter<WindowManagerState> emit,
+  ) {
+    final index = state.windows.indexWhere((w) => w.id == event.id);
+    if (index == -1) return;
+    final updated = [...state.windows];
+    updated[index] = updated[index].copyWith(
+      leadingBuilder: event.leadingBuilder,
+      clearLeadingBuilder: event.leadingBuilder == null,
     );
     emit(state.copyWith(windows: updated));
   }

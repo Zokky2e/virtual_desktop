@@ -52,7 +52,15 @@ class WindowInstance extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, title, position, size, zIndex, isMinimized];
+  List<Object?> get props => [
+    id,
+    title,
+    position,
+    size,
+    zIndex,
+    isMinimized,
+    leadingBuilder,
+  ];
   // contentBuilder and leadingBuilder are deliberately excluded — it's a function reference,
   // Equatable would only ever compare it by identity anyway.
 }

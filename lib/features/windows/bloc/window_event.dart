@@ -83,3 +83,26 @@ class WindowLeadingChanged extends WindowEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class WindowMovedTo extends WindowEvent {
+  const WindowMovedTo(this.id, this.newPosition);
+  final String id;
+  final Offset newPosition;
+  @override
+  List<Object?> get props => [id, newPosition];
+}
+
+class WindowChromeChanged extends WindowEvent {
+  const WindowChromeChanged({
+    required this.id,
+    required this.title,
+    required this.leadingBuilder,
+  });
+
+  final String id;
+  final String title;
+  final WidgetBuilder? leadingBuilder;
+
+  @override
+  List<Object?> get props => [id, title, leadingBuilder != null];
+}

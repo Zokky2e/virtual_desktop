@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/features/preview/presentation/preview_window_content.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
@@ -13,6 +14,7 @@ class DesktopIcon extends StatelessWidget {
     required this.item,
     required this.isSelected,
     this.onFolderDoubleTap,
+    this.iconColor = Colors.white,
   });
 
   /// When non-null, double-tapping a folder calls this instead of opening
@@ -22,6 +24,7 @@ class DesktopIcon extends StatelessWidget {
   final VoidCallback? onFolderDoubleTap;
   final FileItem item;
   final bool isSelected;
+  final Color iconColor;
 
   IconData get _iconData {
     switch (item.type) {
@@ -57,20 +60,24 @@ class DesktopIcon extends StatelessWidget {
         WindowOpened(
           id: item.id,
           title: item.name,
-          contentBuilder: (context) =>
-              FolderWindowContent(windowId: item.id, rootFolder: item),
+          contentBuilder: (context) => FolderWindowContent(
+            key: ValueKey('folder-content-${item.id}'),
+            windowId: item.id,
+            rootFolder: item,
+          ),
         ),
       );
       return;
     }
 
-    // Non-folder — placeholder until Phase 10's PreviewBloc replaces this.
     context.read<WindowBloc>().add(
       WindowOpened(
         id: item.id,
         title: item.name,
-        contentBuilder: (context) =>
-            Center(child: Text('Preview placeholder for "${item.name}"')),
+        contentBuilder: (context) => PreviewWindowContent(
+          key: ValueKey('preview-content-${item.id}'),
+          item: item,
+        ),
       ),
     );
   }
@@ -96,14 +103,32 @@ class DesktopIcon extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_iconData, size: 40, color: Colors.white),
-            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.28),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(_iconData, size: 32, color: iconColor),
+            ),
+            const SizedBox(height: 6),
             Text(
               item.name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              style: TextStyle(
+                color: iconColor,
+                fontSize: 12,
+                shadows: const [
+                  Shadow(
+                    color: Color.fromARGB(115, 0, 0, 0),
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                  Shadow(color: Colors.black54, blurRadius: 8),
+                ],
+              ),
             ),
           ],
         ),

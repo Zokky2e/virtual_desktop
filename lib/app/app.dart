@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:virtual_desktop/core/repositories/settings_repository.dart';
+import 'package:virtual_desktop/features/settings/bloc/settings_bloc.dart';
+import 'package:virtual_desktop/features/settings/bloc/settings_event.dart';
+import 'package:virtual_desktop/features/settings/bloc/settings_state.dart';
 import '../core/di/injector.dart';
 import '../core/repositories/auth_repository.dart';
 import '../features/authentication/bloc/auth_bloc.dart';
@@ -16,6 +20,7 @@ class App extends StatefulWidget {
 
 class _AppState extends State<App> {
   late final AuthBloc _authBloc;
+  late final SettingsBloc _settingsBloc;
   late final GoRouter _router;
 
   @override
@@ -23,25 +28,58 @@ class _AppState extends State<App> {
     super.initState();
     _authBloc = AuthBloc(authRepository: getIt<AuthRepository>())
       ..add(const AuthSubscriptionRequested());
+    _settingsBloc = SettingsBloc(
+      settingsRepository: getIt<SettingsRepository>(),
+    )..add(const SettingsLoadRequested());
     _router = buildRouter(_authBloc);
   }
 
   @override
   void dispose() {
     _authBloc.close();
+    _settingsBloc.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _authBloc,
-      child: MaterialApp.router(
-        title: 'Virtual Desktop',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        ),
-        routerConfig: _router,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: _authBloc),
+        BlocProvider.value(value: _settingsBloc),
+      ],
+      child: BlocBuilder<SettingsBloc, SettingsState>(
+        builder: (context, settingsState) {
+          final themeMode = settingsState is SettingsLoaded
+              ? settingsState.settings.themeMode
+              : ThemeMode.dark;
+          return MaterialApp.router(
+            debugShowCheckedModeBanner: false,
+            title: 'Virtual Desktop',
+            themeMode: themeMode,
+            theme: ThemeData(
+              brightness: Brightness.light,
+              colorScheme: ColorScheme.fromSeed(
+                primary: Colors.white,
+                onPrimary: const Color(0xFF25344A),
+                onSecondary: Colors.blueAccent,
+                seedColor: Colors.deepPurple,
+                brightness: Brightness.light,
+              ),
+            ),
+            darkTheme: ThemeData(
+              brightness: Brightness.dark,
+              colorScheme: ColorScheme.fromSeed(
+                primary: const Color(0xFF25344A),
+                onPrimary: Colors.white,
+                seedColor: Colors.deepPurple,
+                onSecondary: Colors.blueAccent,
+                brightness: Brightness.dark,
+              ),
+            ),
+            routerConfig: _router,
+          );
+        },
       ),
     );
   }

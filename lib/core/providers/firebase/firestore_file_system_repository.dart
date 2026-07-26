@@ -19,10 +19,17 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
       _firestore.collection('files');
 
   Query<Map<String, dynamic>> _folderQuery(String? folderId) {
-    return _files
+    var query = _files
         .where('ownerId', isEqualTo: _getCurrentOwnerId())
-        .where('parentFolderId', isEqualTo: folderId)
         .where('isDeleted', isEqualTo: false);
+
+    if (folderId == null) {
+      query = query.where('parentFolderId', isNull: true);
+    } else {
+      query = query.where('parentFolderId', isEqualTo: folderId);
+    }
+
+    return query;
   }
 
   @override
@@ -37,9 +44,9 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
 
   @override
   Stream<List<FileItem>> watchFolder(String? folderId) {
-    return _folderQuery(folderId).snapshots().map(
-      (snapshot) => snapshot.docs.map(fileItemFromSnapshot).toList(),
-    );
+    return _folderQuery(folderId).snapshots().map((snapshot) {
+      return snapshot.docs.map(fileItemFromSnapshot).toList();
+    });
   }
 
   @override

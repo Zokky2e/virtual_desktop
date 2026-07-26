@@ -17,13 +17,18 @@ class WindowsOverlay extends StatelessWidget {
 
         if (visible.isEmpty) return const SizedBox.shrink();
 
-        final topZ = visible.last.zIndex;
-
         return Stack(
           children: [
             for (final window in visible) ...[
-              DraggableWindow(window: window, isFocused: window.zIndex == topZ),
-              ResizeHandle(window: window),
+              DraggableWindow(
+                key: ValueKey('window-${window.id}'),
+                window: window,
+                isFocused: state.isTopmost(window.id),
+              ),
+              ResizeHandle(
+                key: ValueKey('resize-${window.id}'),
+                window: window,
+              ),
             ],
           ],
         );

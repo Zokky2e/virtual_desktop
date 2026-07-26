@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/core/models/app_settings.dart';
 import 'package:virtual_desktop/core/models/file_item.dart';
 import 'package:virtual_desktop/core/repositories/auth_repository.dart';
 import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
@@ -8,7 +9,11 @@ import 'package:virtual_desktop/core/services/storage_service.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_bloc.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_event.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_state.dart';
-import 'package:virtual_desktop/features/windows/presentation/wndows_overlay.dart';
+import 'package:virtual_desktop/features/settings/bloc/settings_bloc.dart';
+import 'package:virtual_desktop/features/settings/bloc/settings_state.dart';
+import 'package:virtual_desktop/features/settings/presentation/settings_window_content.dart';
+import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
+import 'package:virtual_desktop/features/windows/presentation/windows_overlay.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import '../../../core/di/injector.dart';
 import '../../authentication/bloc/auth_bloc.dart';
@@ -62,10 +67,12 @@ class DesktopPage extends StatelessWidget {
               title: const Text('Desktop'),
               actions: [
                 IconButton(
+                  tooltip: 'Create Folder',
                   icon: const Icon(Icons.create_new_folder),
                   onPressed: () => addNewFolder(context),
                 ),
                 IconButton(
+                  tooltip: 'Upload File',
                   icon: const Icon(Icons.upload_file),
                   onPressed: () async {
                     final result = await FilePicker.platform.pickFiles(
@@ -85,6 +92,18 @@ class DesktopPage extends StatelessWidget {
                       );
                     }
                   },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () => context.read<WindowBloc>().add(
+                    WindowOpened(
+                      id: 'settings-window',
+                      title: 'Settings',
+                      contentBuilder: (context) => const SettingsWindowContent(
+                        key: ValueKey('settings-content'),
+                      ),
+                    ),
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.logout),
@@ -119,24 +138,52 @@ class DesktopPage extends StatelessWidget {
                     ),
                     child: Stack(
                       children: [
-                        Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          color: const Color(0xFF1E2A38),
-                          child: state.isLoading
-                              ? const Center(child: CircularProgressIndicator())
-                              : Wrap(
-                                  spacing: 16,
-                                  runSpacing: 16,
-                                  children: [
-                                    for (final item in state.items)
-                                      DesktopIcon(
-                                        item: item,
-                                        isSelected: state.selectedItemIds
-                                            .contains(item.id),
+                        BlocBuilder<SettingsBloc, SettingsState>(
+                          builder: (context, settingsState) {
+                            final settings = settingsState is SettingsLoaded
+                                ? settingsState.settings
+                                : null;
+
+                            final backgroundDecoration =
+                                settings?.wallpaperType ==
+                                        WallpaperType.image &&
+                                    settings?.wallpaperImageUrl != null
+                                ? BoxDecoration(
+                                    image: DecorationImage(
+                                      image: NetworkImage(
+                                        settings!.wallpaperImageUrl!,
                                       ),
-                                  ],
-                                ),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : BoxDecoration(
+                                    color:
+                                        settings?.wallpaperColor ??
+                                        const Color(0xFF1E2A38),
+                                  );
+
+                            return Container(
+                              width: double.infinity,
+                              height: double.infinity,
+                              decoration: backgroundDecoration,
+                              child: state.isLoading
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : Wrap(
+                                      spacing: 16,
+                                      runSpacing: 16,
+                                      children: [
+                                        for (final item in state.items)
+                                          DesktopIcon(
+                                            item: item,
+                                            isSelected: state.selectedItemIds
+                                                .contains(item.id),
+                                          ),
+                                      ],
+                                    ),
+                            );
+                          },
                         ),
                         const WindowsOverlay(),
                       ],

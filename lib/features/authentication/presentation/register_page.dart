@@ -29,7 +29,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
+      appBar: AppBar(title: const Text('Virtual Desktop - Register')),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthError) {
@@ -50,7 +50,12 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     TextField(
                       controller: _emailController,
-                      decoration: const InputDecoration(labelText: 'Email'),
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        floatingLabelStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSecondary,
+                        ),
+                      ),
                       keyboardType: TextInputType.emailAddress,
                       onSubmitted: (_) {
                         FocusScope.of(context).requestFocus(_passwordFocusNode);
@@ -60,7 +65,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     TextField(
                       controller: _passwordController,
                       focusNode: _passwordFocusNode,
-                      decoration: const InputDecoration(labelText: 'Password'),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        floatingLabelStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSecondary,
+                        ),
+                      ),
                       obscureText: true,
                       onSubmitted: (_) => isLoading ? null : _submit(),
                     ),
@@ -79,7 +89,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       onPressed: isLoading
                           ? null
                           : () => context.go(AppRoutes.login),
-                      child: const Text("Have an account? Login instead."),
+                      child: Text(
+                        "Have an account? Login instead.",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSecondary,
+                        ),
+                      ),
                     ),
                   ],
                 ),

@@ -9,11 +9,12 @@ class WindowBloc extends Bloc<WindowEvent, WindowManagerState> {
     on<WindowOpened>(_onOpened);
     on<WindowClosed>(_onClosed);
     on<WindowFocused>(_onFocused);
-    on<WindowMoved>(_onMoved);
+    on<WindowMovedTo>(_onMovedTo);
     on<WindowResized>(_onResized);
     on<WindowMinimizeToggled>(_onMinimizeToggled);
     on<WindowTitleChanged>(_onTitleChanged);
     on<WindowLeadingChanged>(_onLeadingChanged);
+    on<WindowChromeChanged>(_onChromeChanged);
   }
 
   static const _defaultSize = Size(480, 360);
@@ -70,12 +71,11 @@ class WindowBloc extends Bloc<WindowEvent, WindowManagerState> {
     emit(state.copyWith(windows: updated));
   }
 
-  void _onMoved(WindowMoved event, Emitter<WindowManagerState> emit) {
+  void _onMovedTo(WindowMovedTo event, Emitter<WindowManagerState> emit) {
     final index = state.windows.indexWhere((w) => w.id == event.id);
     if (index == -1) return;
     final updated = [...state.windows];
-    final current = updated[index];
-    updated[index] = current.copyWith(position: current.position + event.delta);
+    updated[index] = updated[index].copyWith(position: event.newPosition);
     emit(state.copyWith(windows: updated));
   }
 
@@ -127,6 +127,21 @@ class WindowBloc extends Bloc<WindowEvent, WindowManagerState> {
     if (index == -1) return;
     final updated = [...state.windows];
     updated[index] = updated[index].copyWith(
+      leadingBuilder: event.leadingBuilder,
+      clearLeadingBuilder: event.leadingBuilder == null,
+    );
+    emit(state.copyWith(windows: updated));
+  }
+
+  void _onChromeChanged(
+    WindowChromeChanged event,
+    Emitter<WindowManagerState> emit,
+  ) {
+    final index = state.windows.indexWhere((w) => w.id == event.id);
+    if (index == -1) return;
+    final updated = [...state.windows];
+    updated[index] = updated[index].copyWith(
+      title: event.title,
       leadingBuilder: event.leadingBuilder,
       clearLeadingBuilder: event.leadingBuilder == null,
     );

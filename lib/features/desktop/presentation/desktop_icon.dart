@@ -14,6 +14,7 @@ class DesktopIcon extends StatelessWidget {
     required this.item,
     required this.isSelected,
     this.onFolderDoubleTap,
+    this.iconColor = Colors.white,
   });
 
   /// When non-null, double-tapping a folder calls this instead of opening
@@ -23,6 +24,7 @@ class DesktopIcon extends StatelessWidget {
   final VoidCallback? onFolderDoubleTap;
   final FileItem item;
   final bool isSelected;
+  final Color iconColor;
 
   IconData get _iconData {
     switch (item.type) {
@@ -58,8 +60,11 @@ class DesktopIcon extends StatelessWidget {
         WindowOpened(
           id: item.id,
           title: item.name,
-          contentBuilder: (context) =>
-              FolderWindowContent(windowId: item.id, rootFolder: item),
+          contentBuilder: (context) => FolderWindowContent(
+            key: ValueKey('folder-content-${item.id}'),
+            windowId: item.id,
+            rootFolder: item,
+          ),
         ),
       );
       return;
@@ -69,7 +74,10 @@ class DesktopIcon extends StatelessWidget {
       WindowOpened(
         id: item.id,
         title: item.name,
-        contentBuilder: (context) => PreviewWindowContent(item: item),
+        contentBuilder: (context) => PreviewWindowContent(
+          key: ValueKey('preview-content-${item.id}'),
+          item: item,
+        ),
       ),
     );
   }
@@ -95,14 +103,14 @@ class DesktopIcon extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_iconData, size: 40, color: Colors.white),
+            Icon(_iconData, size: 40, color: iconColor),
             const SizedBox(height: 4),
             Text(
               item.name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              style: TextStyle(color: iconColor, fontSize: 12),
             ),
           ],
         ),

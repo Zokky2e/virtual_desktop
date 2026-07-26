@@ -22,7 +22,6 @@ class DraggableWindow extends StatelessWidget {
       width: window.size.width,
       height: window.size.height,
       child: GestureDetector(
-        // Any tap inside the window (not just the title bar) brings it to front.
         onTapDown: (_) =>
             context.read<WindowBloc>().add(WindowFocused(window.id)),
         child: Material(
@@ -41,21 +40,44 @@ class DraggableWindow extends StatelessWidget {
   }
 }
 
-class _TitleBar extends StatelessWidget {
+class _TitleBar extends StatefulWidget {
   const _TitleBar({required this.window, required this.isFocused});
 
   final WindowInstance window;
   final bool isFocused;
 
   @override
+  State<_TitleBar> createState() => _TitleBarState();
+}
+
+class _TitleBarState extends State<_TitleBar> {
+  Offset? _dragStartGlobalPosition;
+  Offset? _positionAtDragStart;
+
+  @override
   Widget build(BuildContext context) {
+    final window = widget.window;
     return GestureDetector(
-      onPanUpdate: (details) =>
-          context.read<WindowBloc>().add(WindowMoved(window.id, details.delta)),
+      onPanStart: (details) {
+        _dragStartGlobalPosition = details.globalPosition;
+        _positionAtDragStart = window.position;
+      },
+      onPanUpdate: (details) {
+        if (_dragStartGlobalPosition == null || _positionAtDragStart == null)
+          return;
+        final totalDelta = details.globalPosition - _dragStartGlobalPosition!;
+        context.read<WindowBloc>().add(
+          WindowMovedTo(window.id, _positionAtDragStart! + totalDelta),
+        );
+      },
+      onPanEnd: (_) {
+        _dragStartGlobalPosition = null;
+        _positionAtDragStart = null;
+      },
       child: Container(
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        color: isFocused ? Colors.deepPurple : Colors.grey.shade700,
+        color: widget.isFocused ? Colors.deepPurple : Colors.grey.shade700,
         child: Row(
           children: [
             if (window.leadingBuilder != null) window.leadingBuilder!(context),

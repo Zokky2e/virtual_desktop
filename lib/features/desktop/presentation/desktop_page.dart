@@ -8,7 +8,7 @@ import 'package:virtual_desktop/core/services/storage_service.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_bloc.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_event.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_state.dart';
-import 'package:virtual_desktop/features/windows/presentation/wndows_overlay.dart';
+import 'package:virtual_desktop/features/windows/presentation/windows_overlay.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import '../../../core/di/injector.dart';
 import '../../authentication/bloc/auth_bloc.dart';
@@ -62,10 +62,12 @@ class DesktopPage extends StatelessWidget {
               title: const Text('Desktop'),
               actions: [
                 IconButton(
+                  tooltip: 'Create Folder',
                   icon: const Icon(Icons.create_new_folder),
                   onPressed: () => addNewFolder(context),
                 ),
                 IconButton(
+                  tooltip: 'Upload File',
                   icon: const Icon(Icons.upload_file),
                   onPressed: () async {
                     final result = await FilePicker.platform.pickFiles(

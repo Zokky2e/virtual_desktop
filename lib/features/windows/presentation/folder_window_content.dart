@@ -1,5 +1,13 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/core/repositories/auth_repository.dart';
+import 'package:virtual_desktop/core/services/storage_service.dart';
+import 'package:virtual_desktop/features/file-system/bloc/upload_bloc.dart';
+import 'package:virtual_desktop/features/file-system/bloc/upload_event.dart';
+import 'package:virtual_desktop/features/file-system/bloc/upload_state.dart';
+import 'package:virtual_desktop/features/windows/bloc/window_state.dart';
+import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
@@ -49,12 +57,11 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
   }
 
   void _syncWindowChrome() {
-    final windowBloc = context.read<WindowBloc>();
-    windowBloc.add(WindowTitleChanged(widget.windowId, _currentFolder.name));
-    windowBloc.add(
-      WindowLeadingChanged(
-        widget.windowId,
-        _folderStack.length > 1
+    context.read<WindowBloc>().add(
+      WindowChromeChanged(
+        id: widget.windowId,
+        title: _currentFolder.name,
+        leadingBuilder: _folderStack.length > 1
             ? (context) => IconButton(
                 icon: const Icon(
                   Icons.arrow_back,
@@ -70,42 +77,125 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
     );
   }
 
+  Future<void> _createFolder() async {
+    final uid = getIt<AuthRepository>().currentUser!.uid;
+    await getIt<FileSystemRepository>().createFolder(
+      name: 'New Folder',
+      parentFolderId: _currentFolder.id,
+      ownerId: uid,
+    );
+  }
+
+  Future<void> _uploadFile() async {
+    final result = await FilePicker.platform.pickFiles(withData: true);
+    final file = result?.files.single;
+    if (file?.bytes == null || !mounted) return;
+    context.read<UploadBloc>().add(
+      UploadFileRequested(
+        bytes: file!.bytes!,
+        fileName: file.name,
+        mimeType: mimeTypeForFileName(file.name),
+        parentFolderId: _currentFolder.id,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<FileItem>>(
-      stream: getIt<FileSystemRepository>().watchFolder(_currentFolder.id),
-      builder: (context, snapshot) {
-        final items = snapshot.data ?? const [];
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (items.isEmpty) {
-          return const Center(
-            child: Text(
-              'This folder is empty',
-              style: TextStyle(color: Colors.white70),
+    return BlocProvider(
+      create: (_) => UploadBloc(
+        storageService: getIt<StorageService>(),
+        fileSystemRepository: getIt<FileSystemRepository>(),
+        authRepository: getIt<AuthRepository>(),
+      ),
+      child: BlocListener<UploadBloc, UploadState>(
+        listener: (context, state) {
+          if (state is UploadFailure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Upload failed: ${state.message}')),
+            );
+          }
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BlocBuilder<WindowBloc, WindowManagerState>(
+              builder: (context, windowState) {
+                final isFocused = windowState.isTopmost(widget.windowId);
+                return Container(
+                  color: isFocused ? Colors.deepPurple : Colors.grey.shade700,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.create_new_folder,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        tooltip: 'New Folder',
+                        onPressed: _createFolder,
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.upload_file,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        tooltip: 'Upload File',
+                        onPressed: _uploadFile,
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-          );
-        }
-        return Container(
-          color: const Color(0xFF25344A),
-          padding: const EdgeInsets.all(16),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              for (final item in items)
-                DesktopIcon(
-                  item: item,
-                  isSelected: false,
-                  onFolderDoubleTap: item.isFolder
-                      ? () => _openSubfolder(item)
-                      : null,
+            Expanded(
+              child: StreamBuilder<List<FileItem>>(
+                stream: getIt<FileSystemRepository>().watchFolder(
+                  _currentFolder.id,
                 ),
-            ],
-          ),
-        );
-      },
+                builder: (context, snapshot) {
+                  final items = snapshot.data ?? const [];
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (items.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'This folder is empty',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                    );
+                  }
+                  return Container(
+                    color: Colors.transparent,
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        for (final item in items)
+                          DesktopIcon(
+                            item: item,
+                            iconColor: const Color(0xFF25344A),
+                            isSelected: false,
+                            onFolderDoubleTap: item.isFolder
+                                ? () => _openSubfolder(item)
+                                : null,
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

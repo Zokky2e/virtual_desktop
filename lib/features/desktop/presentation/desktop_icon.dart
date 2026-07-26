@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/features/preview/presentation/preview_window_content.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
@@ -64,13 +65,11 @@ class DesktopIcon extends StatelessWidget {
       return;
     }
 
-    // Non-folder — placeholder until Phase 10's PreviewBloc replaces this.
     context.read<WindowBloc>().add(
       WindowOpened(
         id: item.id,
         title: item.name,
-        contentBuilder: (context) =>
-            Center(child: Text('Preview placeholder for "${item.name}"')),
+        contentBuilder: (context) => PreviewWindowContent(item: item),
       ),
     );
   }

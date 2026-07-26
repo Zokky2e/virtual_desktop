@@ -31,6 +31,7 @@ class _VideoViewerState extends State<VideoViewer> {
     if (!_controller.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
+    _controller.setPreventsDisplaySleepDuringVideoPlayback(true);
     return Center(
       child: AspectRatio(
         aspectRatio: _controller.value.aspectRatio,

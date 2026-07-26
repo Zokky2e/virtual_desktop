@@ -116,84 +116,91 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
             );
           }
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            BlocBuilder<WindowBloc, WindowManagerState>(
-              builder: (context, windowState) {
-                final isFocused = windowState.isTopmost(widget.windowId);
-                return Container(
-                  color: isFocused ? Colors.deepPurple : Colors.grey.shade700,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.create_new_folder,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        tooltip: 'New Folder',
-                        onPressed: _createFolder,
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.upload_file,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        tooltip: 'Upload File',
-                        onPressed: _uploadFile,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            Expanded(
-              child: StreamBuilder<List<FileItem>>(
-                stream: getIt<FileSystemRepository>().watchFolder(
-                  _currentFolder.id,
-                ),
-                builder: (context, snapshot) {
-                  final items = snapshot.data ?? const [];
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (items.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'This folder is empty',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    );
-                  }
+        child: Container(
+          color: Theme.of(context).colorScheme.primary,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              BlocBuilder<WindowBloc, WindowManagerState>(
+                builder: (context, windowState) {
+                  final isFocused = windowState.isTopmost(widget.windowId);
                   return Container(
-                    color: Colors.transparent,
-                    padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
+                    color: isFocused ? Colors.deepPurple : Colors.grey.shade700,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: Row(
                       children: [
-                        for (final item in items)
-                          DesktopIcon(
-                            item: item,
-                            iconColor: const Color(0xFF25344A),
-                            isSelected: false,
-                            onFolderDoubleTap: item.isFolder
-                                ? () => _openSubfolder(item)
-                                : null,
+                        IconButton(
+                          icon: const Icon(
+                            Icons.create_new_folder,
+                            color: Colors.white,
+                            size: 20,
                           ),
+                          tooltip: 'New Folder',
+                          onPressed: _createFolder,
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.upload_file,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          tooltip: 'Upload File',
+                          onPressed: _uploadFile,
+                        ),
                       ],
                     ),
                   );
                 },
               ),
-            ),
-          ],
+              Expanded(
+                child: StreamBuilder<List<FileItem>>(
+                  stream: getIt<FileSystemRepository>().watchFolder(
+                    _currentFolder.id,
+                  ),
+                  builder: (context, snapshot) {
+                    final items = snapshot.data ?? const [];
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'This folder is empty',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                      );
+                    }
+                    return Container(
+                      color: Colors.transparent,
+                      padding: const EdgeInsets.all(16),
+                      child: Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          for (final item in items)
+                            DesktopIcon(
+                              item: item,
+                              iconColor: Theme.of(
+                                context,
+                              ).colorScheme.onPrimary,
+                              isSelected: false,
+                              onFolderDoubleTap: item.isFolder
+                                  ? () => _openSubfolder(item)
+                                  : null,
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -28,6 +28,8 @@ dependencies:
     video_player: ^2.9.0
     audioplayers: ^6.0.0
     flutter_markdown: ^0.7.0
+    shared_preferences: ^2.3.0
+    flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
     flutter_test:

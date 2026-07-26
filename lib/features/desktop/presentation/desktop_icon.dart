@@ -103,14 +103,32 @@ class DesktopIcon extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_iconData, size: 40, color: iconColor),
-            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.28),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(_iconData, size: 32, color: iconColor),
+            ),
+            const SizedBox(height: 6),
             Text(
               item.name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: iconColor, fontSize: 12),
+              style: TextStyle(
+                color: iconColor,
+                fontSize: 12,
+                shadows: const [
+                  Shadow(
+                    color: Color.fromARGB(115, 0, 0, 0),
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                  Shadow(color: Colors.black54, blurRadius: 8),
+                ],
+              ),
             ),
           ],
         ),

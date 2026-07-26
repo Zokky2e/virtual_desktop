@@ -19,9 +19,6 @@ GoRouter buildRouter(AuthBloc authBloc) {
     initialLocation: AppRoutes.loading,
     refreshListenable: GoRouterRefreshStream(authBloc.stream),
     redirect: (context, state) {
-      print(
-        'ROUTER REDIRECT: ${state.matchedLocation} | ${authBloc.state.runtimeType}',
-      );
       final authState = authBloc.state;
       final goingToAuthPage =
           state.matchedLocation == AppRoutes.login ||

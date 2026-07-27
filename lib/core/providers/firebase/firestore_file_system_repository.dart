@@ -159,4 +159,80 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
   Future<Either<Failure, Unit>> deleteFile(String fileId) async {
     return deleteFolder(fileId); // same soft-delete logic
   }
+
+  @override
+  Stream<List<FileItem>> watchDeletedItems(String ownerId) {
+    return _files
+        .where('ownerId', isEqualTo: ownerId)
+        .where('isDeleted', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map(fileItemFromSnapshot).toList());
+  }
+
+  @override
+  Future<Either<Failure, Unit>> restoreItem(String itemId) async {
+    try {
+      await _files.doc(itemId).update({
+        'isDeleted': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return const Right(unit);
+    } catch (e) {
+      return Left(FileSystemFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> hardDeleteItem(String itemId) async {
+    try {
+      await _files.doc(itemId).delete();
+      return const Right(unit);
+    } catch (e) {
+      return Left(FileSystemFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<FileItem>>> searchItems(
+    String ownerId,
+    String query,
+  ) async {
+    try {
+      final snapshot = await _files
+          .where('ownerId', isEqualTo: ownerId)
+          .where('isDeleted', isEqualTo: false)
+          .get();
+      final lowerQuery = query.toLowerCase();
+      final matches = snapshot.docs
+          .map(fileItemFromSnapshot)
+          .where((item) => item.name.toLowerCase().contains(lowerQuery))
+          .toList();
+      return Right(matches);
+    } catch (e) {
+      return Left(FileSystemFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> nameExistsInFolder({
+    required String ownerId,
+    required String? parentFolderId,
+    required String name,
+  }) async {
+    try {
+      var query = _files
+          .where('ownerId', isEqualTo: ownerId)
+          .where('isDeleted', isEqualTo: false)
+          .where('name', isEqualTo: name);
+      if (parentFolderId == null) {
+        query = query.where('parentFolderId', isNull: true);
+      } else {
+        query = query.where('parentFolderId', isEqualTo: parentFolderId);
+      }
+      final snapshot = await query.limit(1).get();
+      return Right(snapshot.docs.isNotEmpty);
+    } catch (e) {
+      return Left(FileSystemFailure(e.toString()));
+    }
+  }
 }

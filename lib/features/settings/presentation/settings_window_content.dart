@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/app_settings.dart';
+import '../../../core/models/file_item.dart';
 import '../../../core/repositories/auth_repository.dart';
+import '../../../core/repositories/wallpaper_repository.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../shared/utils/mime_utils.dart';
 import '../bloc/settings_bloc.dart';
@@ -78,10 +80,51 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
 
     setState(() => _isUploadingWallpaper = true);
 
-    final storageKey =
-        'users/$uid/wallpaper/${DateTime.now().millisecondsSinceEpoch}_${file!.name}';
-
+    final wallpaperRepository = getIt<WallpaperRepository>();
     final storageService = getIt<StorageService>();
+
+    // Dedupe check first — avoid re-uploading a file we already have
+    // saved under the "wallpapers" collection for this user.
+    final existingResult = await wallpaperRepository.findExisting(
+      ownerId: uid,
+      name: file!.name,
+      size: file.bytes!.length,
+    );
+
+    final existing = existingResult.getOrElse((_) => null);
+    if (existing != null) {
+      final urlResult = await storageService.getDownloadUrl(
+        existing.storageKey!,
+      );
+      if (!context.mounted) return;
+      setState(() => _isUploadingWallpaper = false);
+      urlResult.match(
+        (failure) => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load wallpaper: ${failure.message}'),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
+          ),
+        ),
+        (url) {
+          context.read<SettingsBloc>().add(SettingsWallpaperImageChanged(url));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Reused previously uploaded wallpaper'),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.only(left: 16, right: 16, bottom: 64),
+            ),
+          );
+        },
+      );
+      return;
+    }
+
+    // No match — upload fresh, then record it in the wallpapers collection
+    // so it shows up in the gallery and can be deduped against next time.
+    final storageKey =
+        'users/$uid/wallpaper/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+
     final uploadResult = await storageService.uploadFile(
       bytes: file.bytes!,
       path: storageKey,
@@ -96,10 +139,40 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Wallpaper upload failed: ${failure.message}'),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
           ),
         );
       },
       (path) async {
+        final saveResult = await wallpaperRepository.saveWallpaper(
+          name: file.name,
+          ownerId: uid,
+          storageKey: path,
+          size: file.bytes!.length,
+        );
+        saveResult.match(
+          (failure) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Could not save wallpaper record: ${failure.message}',
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 64,
+                  ),
+                ),
+              );
+            }
+          },
+          (
+            _,
+          ) {}, // success — nothing extra to do, gallery stream picks it up automatically
+        );
         final urlResult = await storageService.getDownloadUrl(path);
         if (!context.mounted) return;
         setState(() => _isUploadingWallpaper = false);
@@ -109,6 +182,8 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
               content: Text(
                 'Could not load uploaded wallpaper: ${failure.message}',
               ),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
             ),
           ),
           (url) => context.read<SettingsBloc>().add(
@@ -229,6 +304,17 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              Text(
+                'Previous Wallpapers',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _WallpaperGallery(currentImageUrl: settings.wallpaperImageUrl),
               const SizedBox(height: 20),
               Text(
                 'Custom Image',
@@ -337,6 +423,99 @@ class _WallpaperSwatch extends StatelessWidget {
         ),
       ),
       child: child,
+    );
+  }
+}
+
+class _WallpaperGallery extends StatelessWidget {
+  const _WallpaperGallery({required this.currentImageUrl});
+
+  final String? currentImageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = getIt<AuthRepository>().currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 72,
+      child: StreamBuilder<List<FileItem>>(
+        stream: getIt<WallpaperRepository>().watchWallpapers(uid),
+        builder: (context, snapshot) {
+          final wallpapers = snapshot.data ?? const [];
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          }
+          if (wallpapers.isEmpty) {
+            return Center(
+              child: Text(
+                'No wallpapers uploaded yet',
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onPrimary.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
+              ),
+            );
+          }
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: wallpapers.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) =>
+                _WallpaperThumbnail(item: wallpapers[index]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WallpaperThumbnail extends StatefulWidget {
+  const _WallpaperThumbnail({required this.item});
+  final FileItem item;
+
+  @override
+  State<_WallpaperThumbnail> createState() => _WallpaperThumbnailState();
+}
+
+class _WallpaperThumbnailState extends State<_WallpaperThumbnail> {
+  String? _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUrl();
+  }
+
+  Future<void> _loadUrl() async {
+    final result = await getIt<StorageService>().getDownloadUrl(
+      widget.item.storageKey!,
+    );
+    if (!mounted) return;
+    result.match((_) {}, (url) => setState(() => _url = url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_url == null) {
+      return const SizedBox(
+        width: 72,
+        height: 72,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    return GestureDetector(
+      onTap: () => context.read<SettingsBloc>().add(
+        SettingsWallpaperImageChanged(_url!),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.network(_url!, width: 72, height: 72, fit: BoxFit.cover),
+      ),
     );
   }
 }

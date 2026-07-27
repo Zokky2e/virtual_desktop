@@ -115,4 +115,64 @@ class FakeFileSystemRepository implements FileSystemRepository {
   Future<Either<Failure, Unit>> deleteFile(String fileId) async {
     return deleteFolder(fileId); // same soft-delete logic for now
   }
+
+  @override
+  Stream<List<FileItem>> watchDeletedItems(String ownerId) {
+    final controller = StreamController<List<FileItem>>.broadcast();
+    void emitDeleted() => controller.add(
+      _items.values.where((i) => i.ownerId == ownerId && i.isDeleted).toList(),
+    );
+    _controller.stream.listen((_) => emitDeleted());
+    Future.microtask(emitDeleted);
+    return controller.stream;
+  }
+
+  @override
+  Future<Either<Failure, Unit>> restoreItem(String itemId) async {
+    final item = _items[itemId];
+    if (item == null) return Left(FileSystemFailure('Item not found: $itemId'));
+    _items[itemId] = item.copyWith(isDeleted: false, updatedAt: DateTime.now());
+    _emit(item.parentFolderId);
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, Unit>> hardDeleteItem(String itemId) async {
+    _items.remove(itemId);
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, List<FileItem>>> searchItems(
+    String ownerId,
+    String query,
+  ) async {
+    final lowerQuery = query.toLowerCase();
+    return Right(
+      _items.values
+          .where(
+            (i) =>
+                i.ownerId == ownerId &&
+                !i.isDeleted &&
+                i.name.toLowerCase().contains(lowerQuery),
+          )
+          .toList(),
+    );
+  }
+
+  @override
+  Future<Either<Failure, bool>> nameExistsInFolder({
+    required String ownerId,
+    required String? parentFolderId,
+    required String name,
+  }) async {
+    final exists = _items.values.any(
+      (i) =>
+          i.ownerId == ownerId &&
+          i.parentFolderId == parentFolderId &&
+          !i.isDeleted &&
+          i.name == name,
+    );
+    return Right(exists);
+  }
 }

@@ -6,8 +6,10 @@ import 'package:virtual_desktop/core/services/storage_service.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_bloc.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_event.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_state.dart';
+import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cubit.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_state.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
+import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
@@ -112,7 +114,11 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
         listener: (context, state) {
           if (state is UploadFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Upload failed: ${state.message}')),
+              SnackBar(
+                content: Text('Upload failed: ${state.message}'),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
+              ),
             );
           }
         },
@@ -175,25 +181,62 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                         ),
                       );
                     }
-                    return Container(
-                      color: Colors.transparent,
-                      padding: const EdgeInsets.all(16),
-                      child: Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          for (final item in items)
-                            DesktopIcon(
-                              item: item,
-                              iconColor: Theme.of(
-                                context,
-                              ).colorScheme.onPrimary,
-                              isSelected: false,
-                              onFolderDoubleTap: item.isFolder
-                                  ? () => _openSubfolder(item)
-                                  : null,
+                    return GestureDetector(
+                      onSecondaryTapDown: (details) async {
+                        final clipboard = context.read<FileClipboardCubit>();
+                        final selection = await showMenu<String>(
+                          context: context,
+                          position: RelativeRect.fromLTRB(
+                            details.globalPosition.dx,
+                            details.globalPosition.dy,
+                            details.globalPosition.dx,
+                            details.globalPosition.dy,
+                          ),
+                          items: [
+                            const PopupMenuItem(
+                              value: 'new_folder',
+                              child: Text('New Folder'),
                             ),
-                        ],
+                            const PopupMenuItem(
+                              value: 'upload',
+                              child: Text('Upload File'),
+                            ),
+                            if (!clipboard.state.isEmpty)
+                              const PopupMenuItem(
+                                value: 'paste',
+                                child: Text('Paste'),
+                              ),
+                          ],
+                        );
+                        if (selection == 'new_folder') _createFolder();
+                        if (selection == 'upload') _uploadFile();
+                        if (selection == 'paste') {
+                          await pasteClipboardItem(
+                            context: context,
+                            clipboard: clipboard,
+                            destinationFolderId: _currentFolder.id,
+                          );
+                        }
+                      },
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
+                          children: [
+                            for (final item in items)
+                              DesktopIcon(
+                                item: item,
+                                iconColor: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimary,
+                                isSelected: false,
+                                onFolderDoubleTap: item.isFolder
+                                    ? () => _openSubfolder(item)
+                                    : null,
+                              ),
+                          ],
+                        ),
                       ),
                     );
                   },

@@ -1,17 +1,44 @@
-# virtual_desktop
+# 🖥️ Virtual Desktop
 
-A new Flutter project.
+A browser-based desktop environment built with **Flutter Web**, inspired by modern operating systems.
 
-## Getting Started
+Manage files, open multiple draggable windows, preview media directly from the cloud, and explore a desktop experience designed with **clean architecture** and **provider independence** at its core.
 
-This project is a starting point for a Flutter application.
+## ✨ Features
 
-A few resources to get you started if this is your first Flutter project:
+- 🔐 Firebase Authentication
+- 📁 Cloud file system
+- 🪟 Draggable & resizable windows
+- 🖼️ Image, video, audio, PDF & Markdown previews
+- ☁️ Firebase Storage + Firestore
+- 🧩 Modular BLoC architecture
+- 🔄 Cloud provider abstraction (Firebase today, S3/R2 tomorrow)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## 🏗️ Tech Stack
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter Web
+- flutter_bloc
+- go_router
+- get_it
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Storage
+
+## 🎯 Philosophy
+
+This project is built around one simple idea:
+
+> **Depend on interfaces, not providers.**
+
+Firebase is just the first implementation. Every storage, authentication, and metadata layer is designed to be swapped without changing the UI or business logic.
+
+## 🚧 Roadmap - left to develop
+
+- Drag & Drop
+- Shared files
+- Multiple desktops
+- Cloud provider hot-switching
+
+---
+
+**Status:** 🚧 Active Development

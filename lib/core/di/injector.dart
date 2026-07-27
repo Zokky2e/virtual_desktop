@@ -22,7 +22,9 @@ void setupDependencies() {
     ),
   );
   getIt.registerLazySingleton<SettingsRepository>(
-    () => SharedPrefsSettingsRepository(),
+    () => SharedPrefsSettingsRepository(
+      getCurrentOwnerId: () => getIt<AuthRepository>().currentUser!.uid,
+    ),
   );
   getIt.registerLazySingleton<WallpaperRepository>(
     () => FirestoreWallpaperRepository(),

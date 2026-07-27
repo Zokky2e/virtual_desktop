@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:virtual_desktop/core/repositories/settings_repository.dart';
+import 'package:virtual_desktop/features/authentication/bloc/auth_state.dart';
+import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cubit.dart';
 import 'package:virtual_desktop/features/settings/bloc/settings_bloc.dart';
 import 'package:virtual_desktop/features/settings/bloc/settings_event.dart';
 import 'package:virtual_desktop/features/settings/bloc/settings_state.dart';
@@ -21,7 +25,9 @@ class App extends StatefulWidget {
 class _AppState extends State<App> {
   late final AuthBloc _authBloc;
   late final SettingsBloc _settingsBloc;
+  late final FileClipboardCubit _clipboardCubit;
   late final GoRouter _router;
+  StreamSubscription? _authSubscriptionForSettings;
 
   @override
   void initState() {
@@ -31,13 +37,26 @@ class _AppState extends State<App> {
     _settingsBloc = SettingsBloc(
       settingsRepository: getIt<SettingsRepository>(),
     )..add(const SettingsLoadRequested());
+
+    _clipboardCubit = FileClipboardCubit();
+
+    _authSubscriptionForSettings = _authBloc.stream.listen((authState) {
+      if (authState is Authenticated) {
+        _settingsBloc.add(const SettingsLoadRequested());
+      } else if (authState is Unauthenticated) {
+        _clipboardCubit.clear();
+      }
+    });
+
     _router = buildRouter(_authBloc);
   }
 
   @override
   void dispose() {
+    _authSubscriptionForSettings?.cancel();
     _authBloc.close();
     _settingsBloc.close();
+    _clipboardCubit.close();
     super.dispose();
   }
 
@@ -47,6 +66,7 @@ class _AppState extends State<App> {
       providers: [
         BlocProvider.value(value: _authBloc),
         BlocProvider.value(value: _settingsBloc),
+        BlocProvider.value(value: _clipboardCubit),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {

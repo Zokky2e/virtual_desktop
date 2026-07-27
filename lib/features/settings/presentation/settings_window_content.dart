@@ -102,6 +102,8 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
         (failure) => ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Could not load wallpaper: ${failure.message}'),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
           ),
         ),
         (url) {
@@ -109,6 +111,8 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Reused previously uploaded wallpaper'),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.only(left: 16, right: 16, bottom: 64),
             ),
           );
         },
@@ -135,6 +139,8 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Wallpaper upload failed: ${failure.message}'),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
           ),
         );
       },
@@ -153,6 +159,12 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
                   content: Text(
                     'Could not save wallpaper record: ${failure.message}',
                   ),
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 64,
+                  ),
                 ),
               );
             }
@@ -170,6 +182,8 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
               content: Text(
                 'Could not load uploaded wallpaper: ${failure.message}',
               ),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
             ),
           ),
           (url) => context.read<SettingsBloc>().add(

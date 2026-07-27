@@ -4,10 +4,18 @@ import '../../models/app_settings.dart';
 import '../../repositories/settings_repository.dart';
 
 class SharedPrefsSettingsRepository implements SettingsRepository {
-  static const _themeModeKey = 'settings.themeMode';
-  static const _wallpaperTypeKey = 'settings.wallpaperType';
-  static const _wallpaperColorKey = 'settings.wallpaperColorValue';
-  static const _wallpaperImageUrlKey = 'settings.wallpaperImageUrl';
+  SharedPrefsSettingsRepository({required String Function() getCurrentOwnerId})
+    : _getCurrentOwnerId = getCurrentOwnerId;
+
+  final String Function() _getCurrentOwnerId;
+
+  String get _themeModeKey => 'settings.${_getCurrentOwnerId()}.themeMode';
+  String get _wallpaperTypeKey =>
+      'settings.${_getCurrentOwnerId()}.wallpaperType';
+  String get _wallpaperColorKey =>
+      'settings.${_getCurrentOwnerId()}.wallpaperColorValue';
+  String get _wallpaperImageUrlKey =>
+      'settings.${_getCurrentOwnerId()}.wallpaperImageUrl';
 
   @override
   Future<AppSettings> load() async {
@@ -16,6 +24,7 @@ class SharedPrefsSettingsRepository implements SettingsRepository {
     final wallpaperTypeIndex = prefs.getInt(_wallpaperTypeKey);
     final wallpaperColorValue = prefs.getInt(_wallpaperColorKey);
     final wallpaperImageUrl = prefs.getString(_wallpaperImageUrlKey);
+
     return AppSettings(
       themeMode: themeModeIndex != null
           ? ThemeMode.values[themeModeIndex]

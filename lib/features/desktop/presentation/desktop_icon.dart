@@ -4,6 +4,7 @@ import 'package:virtual_desktop/features/preview/presentation/preview_window_con
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
+import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
 import '../../../core/models/file_item.dart';
 import '../bloc/desktop_bloc.dart';
 import '../bloc/desktop_event.dart';
@@ -92,6 +93,15 @@ class DesktopIcon extends StatelessWidget {
       },
       onDoubleTap: () {
         _handleDoubleTap(context);
+      },
+      onSecondaryTapDown: (details) {
+        final desktopBloc = context.read<DesktopBloc?>();
+        desktopBloc?.add(DesktopIconSelected(item.id));
+        showFileItemContextMenu(
+          context: context,
+          globalPosition: details.globalPosition,
+          item: item,
+        );
       },
       child: Container(
         width: 88,

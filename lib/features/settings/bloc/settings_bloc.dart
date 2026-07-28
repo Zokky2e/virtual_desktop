@@ -1,4 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/core/di/injector.dart';
+import 'package:virtual_desktop/core/models/wallpaper_item.dart';
+import 'package:virtual_desktop/core/repositories/auth_repository.dart';
+import 'package:virtual_desktop/core/repositories/wallpaper_repository.dart';
+import 'package:virtual_desktop/core/services/storage_service.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/repositories/settings_repository.dart';
 import 'settings_event.dart';
@@ -21,7 +26,29 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     SettingsLoadRequested event,
     Emitter<SettingsState> emit,
   ) async {
-    final settings = await _settingsRepository.load();
+    var settings = await _settingsRepository.load();
+    final wallpaperRepository = getIt<WallpaperRepository>();
+    final authRepository = getIt<AuthRepository>();
+    final storageService = getIt<StorageService>();
+    final wallpapers = await wallpaperRepository
+        .watchWallpapers(authRepository.currentUser!.uid)
+        .first;
+    final matching = wallpapers.where((w) => w.isSet);
+
+    if (matching.isNotEmpty) {
+      final storageKey = matching.first.storageKey!;
+      final urlResult = await storageService.getDownloadUrl(storageKey);
+
+      urlResult.match(
+        (_) {},
+        (url) => {
+          settings = settings.copyWith(
+            wallpaperType: WallpaperType.image,
+            wallpaperImageUrl: url,
+          ),
+        },
+      );
+    }
     emit(SettingsLoaded(settings));
   }
 

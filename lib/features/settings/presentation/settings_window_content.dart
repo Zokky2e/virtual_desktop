@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:virtual_desktop/core/models/wallpaper_item.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/models/file_item.dart';
@@ -169,9 +170,12 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
               );
             }
           },
-          (
-            _,
-          ) {}, // success — nothing extra to do, gallery stream picks it up automatically
+          (onRight) async {
+            await wallpaperRepository.updateWallpaper(
+              itemId: onRight.id,
+              ownerId: uid,
+            );
+          }, // success — nothing extra to do, gallery stream picks it up automatically
         );
         final urlResult = await storageService.getDownloadUrl(path);
         if (!context.mounted) return;
@@ -439,7 +443,7 @@ class _WallpaperGallery extends StatelessWidget {
 
     return SizedBox(
       height: 72,
-      child: StreamBuilder<List<FileItem>>(
+      child: StreamBuilder<List<WallpaperItem>>(
         stream: getIt<WallpaperRepository>().watchWallpapers(uid),
         builder: (context, snapshot) {
           final wallpapers = snapshot.data ?? const [];
@@ -476,7 +480,7 @@ class _WallpaperGallery extends StatelessWidget {
 
 class _WallpaperThumbnail extends StatefulWidget {
   const _WallpaperThumbnail({required this.item});
-  final FileItem item;
+  final WallpaperItem item;
 
   @override
   State<_WallpaperThumbnail> createState() => _WallpaperThumbnailState();
@@ -509,9 +513,14 @@ class _WallpaperThumbnailState extends State<_WallpaperThumbnail> {
       );
     }
     return GestureDetector(
-      onTap: () => context.read<SettingsBloc>().add(
-        SettingsWallpaperImageChanged(_url!),
-      ),
+      onTap: () {
+        context.read<SettingsBloc>().add(SettingsWallpaperImageChanged(_url!));
+        final wallpaperRepository = getIt<WallpaperRepository>();
+        wallpaperRepository.updateWallpaper(
+          itemId: widget.item.id,
+          ownerId: widget.item.ownerId,
+        );
+      },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: Image.network(_url!, width: 72, height: 72, fit: BoxFit.cover),

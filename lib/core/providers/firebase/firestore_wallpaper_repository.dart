@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:virtual_desktop/core/models/wallpaper_item.dart';
+import 'package:virtual_desktop/core/providers/firebase/wallpaper_item_mapper.dart';
 import '../../error/failure.dart';
 import '../../models/file_item.dart';
 import '../../repositories/wallpaper_repository.dart';
-import 'file_item_mapper.dart';
 
 class FirestoreWallpaperRepository implements WallpaperRepository {
   FirestoreWallpaperRepository({FirebaseFirestore? firestore})
@@ -15,15 +16,17 @@ class FirestoreWallpaperRepository implements WallpaperRepository {
       _firestore.collection('wallpapers');
 
   @override
-  Stream<List<FileItem>> watchWallpapers(String ownerId) {
+  Stream<List<WallpaperItem>> watchWallpapers(String ownerId) {
     return _wallpapers
         .where('ownerId', isEqualTo: ownerId)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map(fileItemFromSnapshot).toList());
+        .map(
+          (snapshot) => snapshot.docs.map(wallpaperItemFromSnapshot).toList(),
+        );
   }
 
   @override
-  Future<Either<Failure, FileItem?>> findExisting({
+  Future<Either<Failure, WallpaperItem?>> findExisting({
     required String ownerId,
     required String name,
     required int size,
@@ -36,14 +39,14 @@ class FirestoreWallpaperRepository implements WallpaperRepository {
           .limit(1)
           .get();
       if (snapshot.docs.isEmpty) return const Right(null);
-      return Right(fileItemFromSnapshot(snapshot.docs.first));
+      return Right(wallpaperItemFromSnapshot(snapshot.docs.first));
     } catch (e) {
       return Left(FileSystemFailure(e.toString()));
     }
   }
 
   @override
-  Future<Either<Failure, FileItem>> saveWallpaper({
+  Future<Either<Failure, WallpaperItem>> saveWallpaper({
     required String name,
     required String ownerId,
     required String storageKey,
@@ -51,7 +54,7 @@ class FirestoreWallpaperRepository implements WallpaperRepository {
   }) async {
     try {
       final docRef = _wallpapers.doc();
-      final item = FileItem(
+      final item = WallpaperItem(
         id: docRef.id,
         name: name,
         parentFolderId: null,
@@ -65,6 +68,34 @@ class FirestoreWallpaperRepository implements WallpaperRepository {
     } catch (e) {
       // ignore: avoid_print
       print('saveWallpaper failed: $e');
+      return Left(FileSystemFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> updateWallpaper({
+    required String itemId,
+    required String ownerId,
+  }) async {
+    try {
+      final batch = _firestore.batch();
+      final current = await _wallpapers
+          .where('isSet', isEqualTo: true)
+          .where('ownerId', isEqualTo: ownerId)
+          .get();
+      for (final doc in current.docs) {
+        batch.update(doc.reference, {
+          'isSet': false,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      batch.update(_wallpapers.doc(itemId), {
+        'isSet': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+      return const Right(unit);
+    } catch (e) {
       return Left(FileSystemFailure(e.toString()));
     }
   }

@@ -15,7 +15,8 @@
       "fields": [
         { "fieldPath": "ownerId", "order": "ASCENDING" },
         { "fieldPath": "name", "order": "ASCENDING" },
-        { "fieldPath": "size", "order": "ASCENDING" }
+        { "fieldPath": "size", "order": "ASCENDING" },
+        { "fieldPath": "isSet", "order": "ASCENDING" }
       ]
     },
     {

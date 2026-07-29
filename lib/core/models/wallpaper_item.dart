@@ -11,6 +11,7 @@ class WallpaperItem extends FileItem {
     required super.type,
     required super.storageKey,
     required super.size,
+    super.sortIndex = 0,
     super.isDeleted = false,
     super.createdAt,
     super.updatedAt,

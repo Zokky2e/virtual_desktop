@@ -30,6 +30,11 @@ abstract class FileSystemRepository {
 
   Future<Either<Failure, Unit>> move(String itemId, String? newParentFolderId);
 
+  Future<Either<Failure, Unit>> reorder({
+    required String itemId,
+    required double newSortIndex,
+  });
+
   Future<Either<Failure, Unit>> deleteFolder(String folderId);
 
   Future<Either<Failure, Unit>> deleteFile(String fileId);

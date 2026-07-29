@@ -83,17 +83,57 @@ class DesktopIcon extends StatelessWidget {
     );
   }
 
+  Widget _visual(BuildContext context, {required bool selected}) {
+    return Container(
+      width: 88,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: selected ? Colors.white24 : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.28),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(_iconData, size: 32, color: iconColor),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.name,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: iconColor,
+              fontSize: 12,
+              shadows: const [
+                Shadow(
+                  color: Color.fromARGB(115, 0, 0, 0),
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+                Shadow(color: Colors.black54, blurRadius: 8),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final interactive = GestureDetector(
       onTap: () {
-        // Stop the tap from bubbling to the desktop's clear-selection handler.
         final desktopBloc = context.read<DesktopBloc?>();
         desktopBloc?.add(DesktopIconSelected(item.id));
       },
-      onDoubleTap: () {
-        _handleDoubleTap(context);
-      },
+      onDoubleTap: () => _handleDoubleTap(context),
       onSecondaryTapDown: (details) {
         final desktopBloc = context.read<DesktopBloc?>();
         desktopBloc?.add(DesktopIconSelected(item.id));
@@ -103,46 +143,18 @@ class DesktopIcon extends StatelessWidget {
           item: item,
         );
       },
-      child: Container(
-        width: 88,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white24 : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.28),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(_iconData, size: 32, color: iconColor),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: iconColor,
-                fontSize: 12,
-                shadows: const [
-                  Shadow(
-                    color: Color.fromARGB(115, 0, 0, 0),
-                    blurRadius: 4,
-                    offset: Offset(0, 1),
-                  ),
-                  Shadow(color: Colors.black54, blurRadius: 8),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: _visual(context, selected: isSelected),
+    );
+    return Draggable<FileItem>(
+      data: item,
+      // Rendered in the Overlay, so it needs no ambient Material/Theme —
+      // this is what gives the "icon stuck to the cursor" effect.
+      feedback: Material(
+        color: Colors.transparent,
+        child: Opacity(opacity: 0.85, child: _visual(context, selected: false)),
       ),
+      childWhenDragging: Opacity(opacity: 0.35, child: interactive),
+      child: interactive,
     );
   }
 }

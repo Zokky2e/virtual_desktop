@@ -5,28 +5,22 @@ import 'package:virtual_desktop/core/models/app_settings.dart';
 import 'package:virtual_desktop/core/repositories/auth_repository.dart';
 import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
 import 'package:virtual_desktop/core/services/storage_service.dart';
+import 'package:virtual_desktop/features/desktop/presentation/desktop_icon_grid.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_bloc.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_event.dart';
 import 'package:virtual_desktop/features/file-system/bloc/upload_state.dart';
 import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cubit.dart';
-import 'package:virtual_desktop/features/file-system/presentation/recycle_bin_window_content.dart';
-import 'package:virtual_desktop/features/file-system/presentation/search_window_content.dart';
 import 'package:virtual_desktop/features/settings/bloc/settings_bloc.dart';
 import 'package:virtual_desktop/features/settings/bloc/settings_state.dart';
-import 'package:virtual_desktop/features/settings/presentation/settings_window_content.dart';
-import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/features/windows/presentation/taskbar.dart';
 import 'package:virtual_desktop/features/windows/presentation/windows_overlay.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
 import '../../../core/di/injector.dart';
-import '../../authentication/bloc/auth_bloc.dart';
-import '../../authentication/bloc/auth_event.dart';
 import '../../windows/bloc/window_bloc.dart';
 import '../bloc/desktop_bloc.dart';
 import '../bloc/desktop_event.dart';
 import '../bloc/desktop_state.dart';
-import 'desktop_icon.dart';
 
 class DesktopPage extends StatelessWidget {
   const DesktopPage({super.key});
@@ -187,17 +181,10 @@ class DesktopPage extends StatelessWidget {
                                     )
                                   : SingleChildScrollView(
                                       padding: const EdgeInsets.all(16),
-                                      child: Wrap(
-                                        spacing: 16,
-                                        runSpacing: 16,
-                                        children: [
-                                          for (final item in state.items)
-                                            DesktopIcon(
-                                              item: item,
-                                              isSelected: state.selectedItemIds
-                                                  .contains(item.id),
-                                            ),
-                                        ],
+                                      child: DesktopIconGrid(
+                                        items: state.items,
+                                        containerFolderId: null,
+                                        selectedItemIds: state.selectedItemIds,
                                       ),
                                     ),
                             );

@@ -33,9 +33,7 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
   }
 
   Future<double> _nextSortIndex(String? parentFolderId) async {
-    final snapshot = await _folderQuery(
-      parentFolderId,
-    ).orderBy('sortIndex', descending: true).limit(1).get();
+    final snapshot = await _folderQuery(parentFolderId).limitToLast(1).get();
     if (snapshot.docs.isEmpty) return 0;
     final maxIndex = (snapshot.docs.first.data()['sortIndex'] as num?) ?? 0;
     return maxIndex.toDouble() + 1;

@@ -15,6 +15,8 @@ class FirebaseStorageService implements StorageService {
     required Uint8List bytes,
     required String path,
     required String mimeType,
+    String? parentFolderId,
+    String? fileName,
     void Function(double progress)? onProgress,
   }) async {
     try {

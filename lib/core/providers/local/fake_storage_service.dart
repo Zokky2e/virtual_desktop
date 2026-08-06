@@ -11,6 +11,16 @@ class FakeStorageService implements StorageService {
     required Uint8List bytes,
     required String path,
     required String mimeType,
+
+    /// Only used by providers whose upload endpoint creates the file-tree
+    /// record atomically with the bytes (e.g. the API provider). Firebase
+    /// ignores this — its metadata record is created separately by
+    /// FileSystemRepository.createFile, after upload returns.
+    String? parentFolderId,
+
+    /// Same story as [parentFolderId] — ignored by providers that don't
+    /// need it.
+    String? fileName,
     void Function(double progress)? onProgress,
   }) async {
     onProgress?.call(1.0);

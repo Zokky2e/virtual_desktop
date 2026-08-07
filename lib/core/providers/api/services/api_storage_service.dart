@@ -7,12 +7,16 @@ import '../client/api_client.dart';
 import '../client/files_api.dart';
 
 class ApiStorageService implements StorageService {
-  ApiStorageService({required FilesApi filesApi, required ApiClient client})
-    : _filesApi = filesApi,
-      _client = client;
+  ApiStorageService({
+    required FilesApi filesApi,
+    required ApiClient client,
+    this.basePath = '/desktop',
+  }) : _filesApi = filesApi,
+       _client = client;
 
   final FilesApi _filesApi;
   final ApiClient _client;
+  final String basePath;
 
   /// Performs the real POST /desktop/upload — bytes and metadata are
   /// created together server-side. Returns the new item's id, which
@@ -67,7 +71,7 @@ class ApiStorageService implements StorageService {
   Future<Either<Failure, String>> getDownloadUrl(String path) async {
     try {
       final token = await _client.currentIdToken;
-      return Right('${_client.baseUrl}/desktop/stream/$path?token=$token');
+      return Right('${_client.baseUrl}$basePath/stream/$path?token=$token');
     } catch (e) {
       return Left(StorageFailure(_describe(e)));
     }

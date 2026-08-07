@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:virtual_desktop/core/providers/api/client/api_client.dart';
@@ -19,16 +18,16 @@ import '../repositories/wallpaper_repository.dart';
 
 final getIt = GetIt.instance;
 
+/// instanceName used for every shared-tree registration below — one
+/// constant so callers (taskbar.dart) always resolve the same singletons.
+const sharedInstanceName = 'shared';
+
 Future<String?> _currentFirebaseIdToken() =>
     getIt<AuthRepository>().currentUser != null
-    // FirebaseAuthRepository doesn't expose getIdToken directly —
-    // simplest is to reach the SDK once, here, at the DI boundary
-    // rather than growing AuthRepository's interface for one caller.
     ? _firebaseIdToken()
     : Future.value(null);
 
 Future<String?> _firebaseIdToken() async {
-  // ignore: implementation_imports
   final user = fb.FirebaseAuth.instance.currentUser;
   return user?.getIdToken();
 }
@@ -36,19 +35,26 @@ Future<String?> _firebaseIdToken() async {
 void setupDependencies() {
   getIt.registerLazySingleton<AuthRepository>(() => FirebaseAuthRepository());
 
-  // --- Self-hosted API provider (swap back to Firebase by re-pointing
-  // these two registrations at FirebaseStorageService /
-  // FirestoreFileSystemRepository — no BLoC/UI changes needed either way).
   final apiClient = ApiClient(
     baseUrl: dotenv.env['API_BASE_URL']!,
     getIdToken: _currentFirebaseIdToken,
   );
-  final foldersApi = FoldersApi(apiClient);
-  final filesApi = FilesApi(apiClient);
+
+  // One WebSocket connection is reused for both trees — the server
+  // broadcasts a caller's own events plus every shared-tree event to
+  // whoever's connected. Each ApiFileSystemRepository just filters
+  // incoming events by parent_folder_id on its own watchFolder() stream,
+  // so sharing the connection is safe (ApiWebSocketClient.connect() is
+  // already idempotent).
   final wsClient = ApiWebSocketClient(
     baseUrl: dotenv.env['API_BASE_URL']!,
     getIdToken: _currentFirebaseIdToken,
   );
+
+  // --- Personal tree (basePath '/desktop') — the default, unnamed
+  // registrations every existing call site already resolves.
+  final foldersApi = FoldersApi(apiClient);
+  final filesApi = FilesApi(apiClient);
 
   getIt.registerLazySingleton<StorageService>(
     () => ApiStorageService(filesApi: filesApi, client: apiClient),
@@ -59,6 +65,33 @@ void setupDependencies() {
       filesApi: filesApi,
       wsClient: wsClient,
     ),
+  );
+
+  // --- Shared tree (basePath '/desktop/shared') — see
+  // shared-folder-flutter-implementation.md. Same server, same
+  // ApiClient/WebSocket connection, only the REST prefix differs.
+  final sharedFoldersApi = FoldersApi(apiClient, basePath: '/desktop/shared');
+  final sharedFilesApi = FilesApi(apiClient, basePath: '/desktop/shared');
+
+  getIt.registerLazySingleton<FoldersApi>(
+    () => sharedFoldersApi,
+    instanceName: sharedInstanceName,
+  );
+  getIt.registerLazySingleton<StorageService>(
+    () => ApiStorageService(
+      filesApi: sharedFilesApi,
+      client: apiClient,
+      basePath: '/desktop/shared',
+    ),
+    instanceName: sharedInstanceName,
+  );
+  getIt.registerLazySingleton<FileSystemRepository>(
+    () => ApiFileSystemRepository(
+      foldersApi: sharedFoldersApi,
+      filesApi: sharedFilesApi,
+      wsClient: wsClient,
+    ),
+    instanceName: sharedInstanceName,
   );
 
   getIt.registerLazySingleton<SettingsRepository>(

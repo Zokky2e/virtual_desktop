@@ -10,11 +10,24 @@ import '../../core/models/file_item.dart';
 import '../../core/repositories/file_system_repository.dart';
 import '../../core/services/storage_service.dart';
 
+/// Sentinel owner_id the server uses for the shared tree — mirrors
+/// app/constants.py's SHARED_OWNER_ID. Used only to guard against
+/// pasting an item into a tree it doesn't belong to (see
+/// pasteClipboardItem below); the two trees don't support cross-tree
+/// move/copy.
+const _sharedOwnerId = 'shared';
+
 Future<void> showFileItemContextMenu({
   required BuildContext context,
   required Offset globalPosition,
   required FileItem item,
+
+  /// Defaults to the personal-tree repository via getIt when null — pass
+  /// the 'shared'-named instance when this menu is opened on an item
+  /// inside the Shared folder window.
+  FileSystemRepository? fileSystemRepository,
 }) async {
+  final repo = fileSystemRepository ?? getIt<FileSystemRepository>();
   final clipboard = context.read<FileClipboardCubit>();
   final selection = await showMenu<String>(
     context: context,
@@ -36,17 +49,21 @@ Future<void> showFileItemContextMenu({
   if (selection == null || !context.mounted) return;
 
   if (selection == 'rename') {
-    await _showRenameDialog(context, item);
+    await _showRenameDialog(context, item, repo);
   } else if (selection == 'copy') {
     clipboard.copy(item);
   } else if (selection == 'cut') {
     clipboard.cut(item);
   } else if (selection == 'delete') {
-    await _confirmAndDelete(context, item);
+    await _confirmAndDelete(context, item, repo);
   }
 }
 
-Future<void> _showRenameDialog(BuildContext context, FileItem item) async {
+Future<void> _showRenameDialog(
+  BuildContext context,
+  FileItem item,
+  FileSystemRepository repo,
+) async {
   final controller = TextEditingController(text: item.name);
   final newName = await showDialog<String>(
     context: context,
@@ -67,13 +84,17 @@ Future<void> _showRenameDialog(BuildContext context, FileItem item) async {
     ),
   );
   if (newName == null || newName.isEmpty || newName == item.name) return;
-  await getIt<FileSystemRepository>().rename(item.id, newName);
+  await repo.rename(item.id, newName);
   if (context.mounted) {
     context.read<WindowBloc>().add(WindowTitleChanged(item.id, newName));
   }
 }
 
-Future<void> _confirmAndDelete(BuildContext context, FileItem item) async {
+Future<void> _confirmAndDelete(
+  BuildContext context,
+  FileItem item,
+  FileSystemRepository repo,
+) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -93,7 +114,6 @@ Future<void> _confirmAndDelete(BuildContext context, FileItem item) async {
   );
   if (confirmed != true) return;
 
-  final repo = getIt<FileSystemRepository>();
   if (item.isFolder) {
     await repo.deleteFolder(item.id);
   } else {
@@ -102,11 +122,11 @@ Future<void> _confirmAndDelete(BuildContext context, FileItem item) async {
 }
 
 Future<String> _resolveCopyName({
+  required FileSystemRepository repo,
   required String ownerId,
   required String? parentFolderId,
   required String baseName,
 }) async {
-  final repo = getIt<FileSystemRepository>();
   final dotIndex = baseName.lastIndexOf('.');
   final stem = dotIndex > 0 ? baseName.substring(0, dotIndex) : baseName;
   final extension = dotIndex > 0 ? baseName.substring(dotIndex) : '';
@@ -132,12 +152,41 @@ Future<void> pasteClipboardItem({
   required BuildContext context,
   required FileClipboardCubit clipboard,
   required String? destinationFolderId,
+
+  /// Repository/service the paste operation runs against. Defaults to
+  /// the personal-tree instances when null.
+  FileSystemRepository? fileSystemRepository,
+  StorageService? storageService,
+
+  /// Whether [destinationFolderId] lives in the shared tree. Used only to
+  /// reject pasting an item across trees — the backend doesn't support
+  /// moving/copying an item between a user's own tree and the shared one
+  /// (they're different owner_id scopes server-side).
+  bool isSharedDestination = false,
 }) async {
   final clipboardState = clipboard.state;
   if (clipboardState.isEmpty) return;
 
   final item = clipboardState.item!;
-  final repo = getIt<FileSystemRepository>();
+
+  final itemIsShared = item.ownerId == _sharedOwnerId;
+  if (itemIsShared != isSharedDestination) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Moving or copying between personal and shared folders isn't "
+            'supported yet.',
+          ),
+        ),
+      );
+    }
+    clipboard.clear();
+    return;
+  }
+
+  final repo = fileSystemRepository ?? getIt<FileSystemRepository>();
+  final storage = storageService ?? getIt<StorageService>();
 
   if (clipboardState.mode == ClipboardMode.cut) {
     // Pasting into the same folder it's already in is a no-op.
@@ -150,10 +199,8 @@ Future<void> pasteClipboardItem({
     return;
   }
 
-  // Copy mode — folders aren't duplicated recursively in this pass (that's
-  // a meaningfully bigger feature: walking the whole subtree). For now,
-  // copy is file-only; attempting to copy a folder is a silent no-op with
-  // a snackbar explaining why, rather than a half-correct shallow copy.
+  // Copy mode — folders still aren't duplicated recursively (see
+  // original docstring); this applies equally to the shared tree.
   if (item.isFolder) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -166,13 +213,13 @@ Future<void> pasteClipboardItem({
   }
 
   final resolvedName = await _resolveCopyName(
+    repo: repo,
     ownerId: item.ownerId,
     parentFolderId: destinationFolderId,
     baseName: item.name,
   );
 
-  final storageService = getIt<StorageService>();
-  final downloadResult = await storageService.downloadFile(item.storageKey!);
+  final downloadResult = await storage.downloadFile(item.storageKey!);
 
   await downloadResult.match(
     (failure) async {
@@ -185,7 +232,7 @@ Future<void> pasteClipboardItem({
     (bytes) async {
       final newStorageKey =
           'users/${item.ownerId}/${DateTime.now().millisecondsSinceEpoch}_$resolvedName';
-      final uploadResult = await storageService.uploadFile(
+      final uploadResult = await storage.uploadFile(
         bytes: bytes,
         path: newStorageKey,
         mimeType: mimeTypeForFileName(resolvedName),

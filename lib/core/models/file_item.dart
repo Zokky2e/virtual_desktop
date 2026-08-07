@@ -9,6 +9,7 @@ enum FileItemType {
   text,
   json,
   markdown,
+  subtitle,
   other,
 }
 

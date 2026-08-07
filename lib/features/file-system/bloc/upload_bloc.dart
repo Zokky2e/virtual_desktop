@@ -41,6 +41,8 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
       bytes: event.bytes,
       path: storageKey,
       mimeType: event.mimeType,
+      parentFolderId: event.parentFolderId,
+      fileName: event.fileName,
       onProgress: (progress) => emit(UploadInProgress(progress)),
     );
 

@@ -10,6 +10,7 @@ extension FileItemMapper on FileItem {
       'type': type.name,
       'storageKey': storageKey,
       'size': size,
+      'sortIndex': sortIndex,
       'isDeleted': isDeleted,
       'createdAt': createdAt != null
           ? Timestamp.fromDate(createdAt!)
@@ -29,6 +30,7 @@ FileItem fileItemFromSnapshot(DocumentSnapshot<Map<String, dynamic>> doc) {
     type: FileItemType.values.byName(data['type'] as String),
     storageKey: data['storageKey'] as String?,
     size: data['size'] as int? ?? 0,
+    sortIndex: (data['sortIndex'] as num?)?.toDouble() ?? 0,
     isDeleted: data['isDeleted'] as bool? ?? false,
     createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),

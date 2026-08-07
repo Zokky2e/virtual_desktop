@@ -11,6 +11,23 @@ Future<void> main() async {
   if (kIsWeb) {
     await BrowserContextMenu.disableContextMenu();
   }
+  FlutterError.onError = (details) {
+    if (details.exception.toString().contains(
+      'data[\$_get] is not a function',
+    )) {
+      return;
+    }
+
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint("PlatformDispatcher caught: $error");
+    if (error.toString().contains('data[\$_get] is not a function')) {
+      return true; // mark as handled, do not print
+    }
+
+    return false; // allow normal errors
+  };
   await dotenv.load(fileName: ".env");
   await Firebase.initializeApp(
     options: FirebaseOptions(

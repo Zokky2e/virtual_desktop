@@ -6,7 +6,8 @@
       "fields": [
         { "fieldPath": "ownerId", "order": "ASCENDING" },
         { "fieldPath": "parentFolderId", "order": "ASCENDING" },
-        { "fieldPath": "isDeleted", "order": "ASCENDING" }
+        { "fieldPath": "isDeleted", "order": "ASCENDING" },
+        { "fieldPath": "sortIndex", "order": "ASCENDING" }
       ]
     },
     {

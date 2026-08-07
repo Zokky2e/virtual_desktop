@@ -29,7 +29,14 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
       query = query.where('parentFolderId', isEqualTo: folderId);
     }
 
-    return query;
+    return query.orderBy('sortIndex');
+  }
+
+  Future<double> _nextSortIndex(String? parentFolderId) async {
+    final snapshot = await _folderQuery(parentFolderId).limitToLast(1).get();
+    if (snapshot.docs.isEmpty) return 0;
+    final maxIndex = (snapshot.docs.first.data()['sortIndex'] as num?) ?? 0;
+    return maxIndex.toDouble() + 1;
   }
 
   @override
@@ -94,6 +101,7 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
   }) async {
     try {
       final docRef = _files.doc();
+      final sortIndex = await _nextSortIndex(parentFolderId);
       final item = FileItem(
         id: docRef.id,
         name: name,
@@ -102,6 +110,7 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
         type: type,
         storageKey: storageKey,
         size: size,
+        sortIndex: sortIndex,
       );
       await docRef.set(item.toFirestore());
       return Right(item);
@@ -129,8 +138,26 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
     String? newParentFolderId,
   ) async {
     try {
+      final sortIndex = await _nextSortIndex(newParentFolderId);
       await _files.doc(itemId).update({
         'parentFolderId': newParentFolderId,
+        'sortIndex': sortIndex,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return const Right(unit);
+    } catch (e) {
+      return Left(FileSystemFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> reorder({
+    required String itemId,
+    required double newSortIndex,
+  }) async {
+    try {
+      await _files.doc(itemId).update({
+        'sortIndex': newSortIndex,
         'updatedAt': FieldValue.serverTimestamp(),
       });
       return const Right(unit);

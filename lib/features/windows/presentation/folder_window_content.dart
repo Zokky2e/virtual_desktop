@@ -181,63 +181,74 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                         ),
                       );
                     }
-                    return GestureDetector(
-                      onSecondaryTapDown: (details) async {
-                        final clipboard = context.read<FileClipboardCubit>();
-                        final selection = await showMenu<String>(
-                          context: context,
-                          position: RelativeRect.fromLTRB(
-                            details.globalPosition.dx,
-                            details.globalPosition.dy,
-                            details.globalPosition.dx,
-                            details.globalPosition.dy,
+                    return DragTarget<FileItem>(
+                      // Empty space inside this folder window — drop lands in this folder.
+                      onAcceptWithDetails: (details) =>
+                          getIt<FileSystemRepository>().move(
+                            details.data.id,
+                            _currentFolder.id,
                           ),
-                          items: [
-                            const PopupMenuItem(
-                              value: 'new_folder',
-                              child: Text('New Folder'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'upload',
-                              child: Text('Upload File'),
-                            ),
-                            if (!clipboard.state.isEmpty)
-                              const PopupMenuItem(
-                                value: 'paste',
-                                child: Text('Paste'),
+                      builder: (context, candidateData, rejectedData) {
+                        return GestureDetector(
+                          onSecondaryTapDown: (details) async {
+                            final clipboard = context
+                                .read<FileClipboardCubit>();
+                            final selection = await showMenu<String>(
+                              context: context,
+                              position: RelativeRect.fromLTRB(
+                                details.globalPosition.dx,
+                                details.globalPosition.dy,
+                                details.globalPosition.dx,
+                                details.globalPosition.dy,
                               ),
-                          ],
+                              items: [
+                                const PopupMenuItem(
+                                  value: 'new_folder',
+                                  child: Text('New Folder'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'upload',
+                                  child: Text('Upload File'),
+                                ),
+                                if (!clipboard.state.isEmpty)
+                                  const PopupMenuItem(
+                                    value: 'paste',
+                                    child: Text('Paste'),
+                                  ),
+                              ],
+                            );
+                            if (selection == 'new_folder') _createFolder();
+                            if (selection == 'upload') _uploadFile();
+                            if (selection == 'paste') {
+                              await pasteClipboardItem(
+                                context: context,
+                                clipboard: clipboard,
+                                destinationFolderId: _currentFolder.id,
+                              );
+                            }
+                          },
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Wrap(
+                              spacing: 16,
+                              runSpacing: 16,
+                              children: [
+                                for (final item in items)
+                                  DesktopIcon(
+                                    item: item,
+                                    iconColor: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                    isSelected: false,
+                                    onFolderDoubleTap: item.isFolder
+                                        ? () => _openSubfolder(item)
+                                        : null,
+                                  ),
+                              ],
+                            ),
+                          ),
                         );
-                        if (selection == 'new_folder') _createFolder();
-                        if (selection == 'upload') _uploadFile();
-                        if (selection == 'paste') {
-                          await pasteClipboardItem(
-                            context: context,
-                            clipboard: clipboard,
-                            destinationFolderId: _currentFolder.id,
-                          );
-                        }
                       },
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Wrap(
-                          spacing: 16,
-                          runSpacing: 16,
-                          children: [
-                            for (final item in items)
-                              DesktopIcon(
-                                item: item,
-                                iconColor: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimary,
-                                isSelected: false,
-                                onFolderDoubleTap: item.isFolder
-                                    ? () => _openSubfolder(item)
-                                    : null,
-                              ),
-                          ],
-                        ),
-                      ),
                     );
                   },
                 ),

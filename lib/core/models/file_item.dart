@@ -21,6 +21,7 @@ class FileItem extends Equatable {
     required this.type,
     required this.storageKey,
     required this.size,
+    this.sortIndex = 0,
     this.isDeleted = false,
     this.createdAt,
     this.updatedAt,
@@ -33,6 +34,7 @@ class FileItem extends Equatable {
   final FileItemType type;
   final String? storageKey; // null for folders
   final int size; // bytes, 0 for folders
+  final double sortIndex;
   final bool isDeleted;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -42,6 +44,7 @@ class FileItem extends Equatable {
   FileItem copyWith({
     String? name,
     String? parentFolderId,
+    double? sortIndex,
     bool? isDeleted,
     DateTime? updatedAt,
   }) {
@@ -53,6 +56,7 @@ class FileItem extends Equatable {
       type: type,
       storageKey: storageKey,
       size: size,
+      sortIndex: sortIndex ?? this.sortIndex,
       isDeleted: isDeleted ?? this.isDeleted,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -68,6 +72,7 @@ class FileItem extends Equatable {
     type,
     storageKey,
     size,
+    sortIndex,
     isDeleted,
     createdAt,
     updatedAt,

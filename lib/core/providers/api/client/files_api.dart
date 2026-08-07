@@ -3,12 +3,15 @@ import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'api_client.dart';
 
+/// Talks to the file-content endpoints under [basePath] — see
+/// FoldersApi's docstring for the personal-vs-shared split.
 class FilesApi {
-  FilesApi(this._client);
+  FilesApi(this._client, {this.basePath = '/desktop'});
   final ApiClient _client;
+  final String basePath;
 
   Future<Map<String, dynamic>> getItem(String itemId) async {
-    final res = await _client.dio.get('/desktop/file/$itemId');
+    final res = await _client.dio.get('$basePath/file/$itemId');
     return res.data as Map<String, dynamic>;
   }
 
@@ -27,7 +30,7 @@ class FilesApi {
       ),
     });
     final res = await _client.dio.post(
-      '/desktop/upload',
+      '$basePath/upload',
       data: formData,
       queryParameters: parentFolderId != null
           ? {'parent_folder_id': parentFolderId}
@@ -41,7 +44,7 @@ class FilesApi {
 
   Future<Uint8List> download(String itemId) async {
     final res = await _client.dio.get<List<int>>(
-      '/desktop/download/$itemId',
+      '$basePath/download/$itemId',
       options: Options(responseType: ResponseType.bytes),
     );
     return Uint8List.fromList(res.data!);
@@ -49,7 +52,7 @@ class FilesApi {
 
   Future<Map<String, dynamic>> rename(String itemId, String newName) async {
     final res = await _client.dio.patch(
-      '/desktop/file/$itemId',
+      '$basePath/file/$itemId',
       data: {'name': newName},
     );
     return res.data as Map<String, dynamic>;
@@ -60,12 +63,12 @@ class FilesApi {
     String? newParentFolderId,
   ) async {
     final res = await _client.dio.patch(
-      '/desktop/move',
+      '$basePath/move',
       data: {'item_id': itemId, 'parent_folder_id': newParentFolderId},
     );
     return res.data as Map<String, dynamic>;
   }
 
   Future<void> deleteItem(String itemId) =>
-      _client.dio.delete('/desktop/file/$itemId');
+      _client.dio.delete('$basePath/file/$itemId');
 }

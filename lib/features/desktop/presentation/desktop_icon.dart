@@ -6,6 +6,8 @@ import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
 import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
 import '../../../core/models/file_item.dart';
+import '../../../core/repositories/file_system_repository.dart';
+import '../../../core/services/storage_service.dart';
 import '../bloc/desktop_bloc.dart';
 import '../bloc/desktop_event.dart';
 
@@ -16,6 +18,8 @@ class DesktopIcon extends StatelessWidget {
     required this.isSelected,
     this.onFolderDoubleTap,
     this.iconColor = Colors.white,
+    this.fileSystemRepository,
+    this.storageService,
   });
 
   /// When non-null, double-tapping a folder calls this instead of opening
@@ -26,6 +30,12 @@ class DesktopIcon extends StatelessWidget {
   final FileItem item;
   final bool isSelected;
   final Color iconColor;
+
+  /// Repository/service this icon's actions (context menu, preview) use.
+  /// Null means "use the default personal-tree instances" — set by
+  /// callers rendering items from another tree, e.g. the Shared window.
+  final FileSystemRepository? fileSystemRepository;
+  final StorageService? storageService;
 
   IconData get _iconData {
     switch (item.type) {
@@ -65,6 +75,8 @@ class DesktopIcon extends StatelessWidget {
             key: ValueKey('folder-content-${item.id}'),
             windowId: item.id,
             rootFolder: item,
+            fileSystemRepository: fileSystemRepository,
+            storageService: storageService,
           ),
         ),
       );
@@ -78,50 +90,54 @@ class DesktopIcon extends StatelessWidget {
         contentBuilder: (context) => PreviewWindowContent(
           key: ValueKey('preview-content-${item.id}'),
           item: item,
+          storageService: storageService,
         ),
       ),
     );
   }
 
   Widget _visual(BuildContext context, {required bool selected}) {
-    return Container(
-      width: 88,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: selected ? Colors.white24 : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.28),
-              shape: BoxShape.circle,
+    return Tooltip(
+      message: item.name,
+      child: Container(
+        width: 88,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white24 : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.28),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(_iconData, size: 32, color: iconColor),
             ),
-            child: Icon(_iconData, size: 32, color: iconColor),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            item.name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: iconColor,
-              fontSize: 12,
-              shadows: const [
-                Shadow(
-                  color: Color.fromARGB(115, 0, 0, 0),
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-                Shadow(color: Colors.black54, blurRadius: 8),
-              ],
+            const SizedBox(height: 6),
+            Text(
+              item.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: iconColor,
+                fontSize: 12,
+                shadows: const [
+                  Shadow(
+                    color: Color.fromARGB(115, 0, 0, 0),
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                  Shadow(color: Colors.black54, blurRadius: 8),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -141,14 +157,13 @@ class DesktopIcon extends StatelessWidget {
           context: context,
           globalPosition: details.globalPosition,
           item: item,
+          fileSystemRepository: fileSystemRepository,
         );
       },
       child: _visual(context, selected: isSelected),
     );
     return Draggable<FileItem>(
       data: item,
-      // Rendered in the Overlay, so it needs no ambient Material/Theme —
-      // this is what gives the "icon stuck to the cursor" effect.
       feedback: Material(
         color: Colors.transparent,
         child: Opacity(opacity: 0.85, child: _visual(context, selected: false)),

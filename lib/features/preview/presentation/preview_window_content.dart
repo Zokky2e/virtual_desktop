@@ -16,14 +16,19 @@ import 'viewers/json_viewer.dart';
 import 'viewers/markdown_viewer.dart';
 
 class PreviewWindowContent extends StatelessWidget {
-  const PreviewWindowContent({super.key, required this.item});
+  const PreviewWindowContent({
+    super.key,
+    required this.item,
+    this.storageService,
+  });
   final FileItem item;
+  final StorageService? storageService;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
-          PreviewBloc(storageService: getIt<StorageService>())
+          PreviewBloc(storageService: storageService ?? getIt<StorageService>())
             ..add(PreviewRequested(item)),
       child: Container(
         color: const Color(0xFF181818),

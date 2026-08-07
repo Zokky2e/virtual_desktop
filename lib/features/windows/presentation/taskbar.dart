@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/core/di/injector.dart';
+import 'package:virtual_desktop/core/providers/api/client/folders_api.dart';
+import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
+import 'package:virtual_desktop/core/services/storage_service.dart';
 import 'package:virtual_desktop/features/file-system/presentation/recycle_bin_window_content.dart';
 import 'package:virtual_desktop/features/file-system/presentation/search_window_content.dart';
+import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import '../../authentication/bloc/auth_event.dart';
 import '../../settings/presentation/settings_window_content.dart';
@@ -51,6 +56,29 @@ class Taskbar extends StatelessWidget {
               title: 'Recycle Bin',
               contentBuilder: (context) => const RecycleBinWindowContent(
                 key: ValueKey('recycle-bin-content'),
+              ),
+            ),
+          ),
+          _TaskbarIconButton(
+            icon: Icons.folder_shared,
+            tooltip: 'Shared',
+            onPressed: () => _openSingleton(
+              context,
+              id: 'shared-folder-window',
+              title: 'Shared',
+              contentBuilder: (context) => FolderWindowContent(
+                key: const ValueKey('shared-folder-content'),
+                windowId: 'shared-folder-window',
+                rootTitle: 'Shared',
+                isShared: true,
+                fileSystemRepository: getIt<FileSystemRepository>(
+                  instanceName: sharedInstanceName,
+                ),
+                storageService: getIt<StorageService>(
+                  instanceName: sharedInstanceName,
+                ),
+                onSync: () =>
+                    getIt<FoldersApi>(instanceName: sharedInstanceName).sync(),
               ),
             ),
           ),

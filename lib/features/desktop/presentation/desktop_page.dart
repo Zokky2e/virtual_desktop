@@ -15,6 +15,7 @@ import 'package:virtual_desktop/features/settings/bloc/settings_state.dart';
 import 'package:virtual_desktop/features/windows/presentation/taskbar.dart';
 import 'package:virtual_desktop/features/windows/presentation/windows_overlay.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
+import 'package:virtual_desktop/shared/widgets/adaptive_image_provider.dart';
 import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
 import '../../../core/di/injector.dart';
 import '../../windows/bloc/window_bloc.dart';
@@ -158,7 +159,7 @@ class DesktopPage extends StatelessWidget {
                                     settings?.wallpaperImageUrl != null
                                 ? BoxDecoration(
                                     image: DecorationImage(
-                                      image: NetworkImage(
+                                      image: adaptiveImageProvider(
                                         settings!.wallpaperImageUrl!,
                                       ),
                                       fit: BoxFit.cover,

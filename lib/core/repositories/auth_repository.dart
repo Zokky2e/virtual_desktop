@@ -19,4 +19,10 @@ abstract class AuthRepository {
   });
 
   Future<Either<Failure, Unit>> signOut();
+
+  /// A valid (refreshed if necessary) ID token for backend calls, or null
+  /// if signed out. Callers (ApiClient, ApiWebSocketClient) go through
+  /// this instead of touching any SDK directly — keeps them provider-
+  /// agnostic the same way FileSystemRepository/StorageService already are.
+  Future<String?> getIdToken();
 }

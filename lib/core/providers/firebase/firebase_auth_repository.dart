@@ -81,4 +81,15 @@ class FirebaseAuthRepository implements AuthRepository {
       return Left(AuthFailure(e.toString()));
     }
   }
+
+  @override
+  Future<String?> getIdToken() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return null;
+    try {
+      return await user.getIdToken();
+    } catch (_) {
+      return null;
+    }
+  }
 }

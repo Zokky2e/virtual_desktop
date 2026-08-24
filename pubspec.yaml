@@ -31,11 +31,13 @@ dependencies:
     shared_preferences: ^2.3.0
     flutter_colorpicker: ^1.1.0
 
+    path_provider: ^2.1.0
+    path: ^1.9.0
+
     web_socket_channel: ^3.0.0
     http_parser: ^4.0.2
-    flutter_vlc_player: ^7.4.4
     url_launcher: ^6.3.2
-
+    vlc_player: ^2.1.2
 dev_dependencies:
     flutter_test:
         sdk: flutter

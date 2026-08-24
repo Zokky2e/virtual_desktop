@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:virtual_desktop/core/models/wallpaper_item.dart';
+import 'package:virtual_desktop/shared/widgets/adaptive_image_provider.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/models/file_item.dart';
@@ -81,8 +82,12 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
 
     setState(() => _isUploadingWallpaper = true);
 
-    final wallpaperRepository = getIt<WallpaperRepository>();
-    final storageService = getIt<StorageService>();
+    final wallpaperRepository = getIt<WallpaperRepository>(
+      instanceName: wallpaperInstanceName,
+    );
+    final storageService = getIt<StorageService>(
+      instanceName: wallpaperInstanceName,
+    );
 
     // Dedupe check first — avoid re-uploading a file we already have
     // saved under the "wallpapers" collection for this user.
@@ -333,10 +338,10 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
                   settings.wallpaperImageUrl != null) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    settings.wallpaperImageUrl!,
+                  child: Image(
+                    image: adaptiveImageProvider(settings.wallpaperImageUrl!),
                     height: 100,
-                    width: double.infinity,
+                    width: 100,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -444,7 +449,9 @@ class _WallpaperGallery extends StatelessWidget {
     return SizedBox(
       height: 72,
       child: StreamBuilder<List<WallpaperItem>>(
-        stream: getIt<WallpaperRepository>().watchWallpapers(uid),
+        stream: getIt<WallpaperRepository>(
+          instanceName: wallpaperInstanceName,
+        ).watchWallpapers(uid),
         builder: (context, snapshot) {
           final wallpapers = snapshot.data ?? const [];
           if (!snapshot.hasData) {
@@ -496,9 +503,9 @@ class _WallpaperThumbnailState extends State<_WallpaperThumbnail> {
   }
 
   Future<void> _loadUrl() async {
-    final result = await getIt<StorageService>().getDownloadUrl(
-      widget.item.storageKey!,
-    );
+    final result = await getIt<StorageService>(
+      instanceName: wallpaperInstanceName,
+    ).getDownloadUrl(widget.item.storageKey!);
     if (!mounted) return;
     result.match((_) {}, (url) => setState(() => _url = url));
   }
@@ -515,7 +522,9 @@ class _WallpaperThumbnailState extends State<_WallpaperThumbnail> {
     return GestureDetector(
       onTap: () {
         context.read<SettingsBloc>().add(SettingsWallpaperImageChanged(_url!));
-        final wallpaperRepository = getIt<WallpaperRepository>();
+        final wallpaperRepository = getIt<WallpaperRepository>(
+          instanceName: wallpaperInstanceName,
+        );
         wallpaperRepository.updateWallpaper(
           itemId: widget.item.id,
           ownerId: widget.item.ownerId,
@@ -523,7 +532,12 @@ class _WallpaperThumbnailState extends State<_WallpaperThumbnail> {
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(6),
-        child: Image.network(_url!, width: 72, height: 72, fit: BoxFit.cover),
+        child: Image(
+          image: adaptiveImageProvider(_url!),
+          height: 72,
+          width: 72,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

@@ -26,6 +26,7 @@ class PreviewBloc extends Bloc<PreviewEvent, PreviewState> {
     FileItemType.text,
     FileItemType.json,
     FileItemType.markdown,
+    FileItemType.subtitle,
   };
 
   Future<void> _onRequested(

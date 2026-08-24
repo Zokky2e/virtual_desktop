@@ -73,6 +73,9 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
     if (mimeType == 'application/json') return FileItemType.json;
     if (mimeType == 'text/markdown') return FileItemType.markdown;
     if (mimeType.startsWith('text/')) return FileItemType.text;
+    if (mimeType == 'application/x-subrip' || mimeType == 'text/vtt') {
+      return FileItemType.subtitle;
+    }
     return FileItemType.other;
   }
 }

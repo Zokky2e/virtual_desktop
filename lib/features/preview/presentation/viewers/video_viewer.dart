@@ -1,62 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
-
-class VideoViewer extends StatefulWidget {
-  const VideoViewer({super.key, required this.url});
-  final String url;
-
-  @override
-  State<VideoViewer> createState() => _VideoViewerState();
-}
-
-class _VideoViewerState extends State<VideoViewer> {
-  late final VideoPlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
-      ..initialize().then((_) => setState(() {}))
-      ..setLooping(false);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_controller.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    _controller.setPreventsDisplaySleepDuringVideoPlayback(true);
-    return Center(
-      child: AspectRatio(
-        aspectRatio: _controller.value.aspectRatio,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            VideoPlayer(_controller),
-            VideoProgressIndicator(_controller, allowScrubbing: true),
-            Positioned(
-              bottom: 8,
-              child: IconButton(
-                icon: Icon(
-                  _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: Colors.white,
-                ),
-                onPressed: () => setState(() {
-                  _controller.value.isPlaying
-                      ? _controller.pause()
-                      : _controller.play();
-                }),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// Conditionally selects the video preview implementation:
+//  - Web build       -> video_viewer_web.dart      (video_player)
+//  - Windows/Linux/macOS/mobile -> video_viewer_desktop.dart (flutter_vlc_player)
+//
+// See Windows-Desktop-Video-Player-VLC-Plan.md for why libVLC was chosen
+// for desktop and what to swap to if CPU usage becomes a problem — that
+// swap only ever touches video_viewer_desktop.dart, nothing upstream.
+export 'video_viewer_stub.dart'
+    if (dart.library.html) 'video_viewer_web.dart'
+    if (dart.library.io) 'video_viewer_desktop.dart';

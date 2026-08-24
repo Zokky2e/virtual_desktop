@@ -27,9 +27,13 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     Emitter<SettingsState> emit,
   ) async {
     var settings = await _settingsRepository.load();
-    final wallpaperRepository = getIt<WallpaperRepository>();
+    final wallpaperRepository = getIt<WallpaperRepository>(
+      instanceName: wallpaperInstanceName,
+    );
+    final storageService = getIt<StorageService>(
+      instanceName: wallpaperInstanceName,
+    );
     final authRepository = getIt<AuthRepository>();
-    final storageService = getIt<StorageService>();
     final wallpapers = await wallpaperRepository
         .watchWallpapers(authRepository.currentUser!.uid)
         .first;

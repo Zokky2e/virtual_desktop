@@ -26,6 +26,8 @@ const Map<String, String> _extensionToMimeType = {
   'markdown': 'text/markdown',
   'txt': 'text/plain',
   'csv': 'text/csv',
+  'srt': 'application/x-subrip',
+  'vtt': 'text/vtt',
 };
 
 /// Returns a best-guess MIME type for [fileName] based on its extension,

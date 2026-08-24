@@ -55,6 +55,8 @@ class DesktopIcon extends StatelessWidget {
         return Icons.data_object;
       case FileItemType.markdown:
         return Icons.article;
+      case FileItemType.subtitle:
+        return Icons.subtitles;
       case FileItemType.other:
         return Icons.insert_drive_file;
     }
@@ -91,6 +93,7 @@ class DesktopIcon extends StatelessWidget {
           key: ValueKey('preview-content-${item.id}'),
           item: item,
           storageService: storageService,
+          fileSystemRepository: fileSystemRepository,
         ),
       ),
     );

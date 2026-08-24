@@ -68,10 +68,6 @@ class _VideoViewerState extends State<VideoViewer> {
   void _enterFullscreen() {
     if (_isFullscreen || !mounted) return;
 
-    // Show the root-level overlay and remove the normal copy from the
-    // internal window in the same rebuild. The GlobalKey lets Flutter
-    // reparent the existing player subtree instead of creating another
-    // VlcPlayer/VlcPlayerController.
     _fullscreenOverlayController.show();
 
     setState(() {
@@ -151,15 +147,31 @@ class _DesktopVideoPlayerViewState extends State<_DesktopVideoPlayerView> {
   @override
   void initState() {
     super.initState();
+
     _controller.addListener(_onControllerChanged);
+    widget.playback.addListener(_onPlaybackChanged);
+
+    // The native VLC controller must be attached before subtitle discovery.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(widget.playback.loadEmbeddedSubtitleTracks());
+      }
+    });
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
     _controller.removeListener(_onControllerChanged);
+    widget.playback.removeListener(_onPlaybackChanged);
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onPlaybackChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _onControllerChanged() {
@@ -169,6 +181,10 @@ class _DesktopVideoPlayerViewState extends State<_DesktopVideoPlayerView> {
       setState(() => _controlsVisible = true);
     } else {
       setState(() {});
+    }
+
+    if (_value.isReady) {
+      unawaited(widget.playback.loadEmbeddedSubtitleTracks());
     }
   }
 
@@ -196,17 +212,17 @@ class _DesktopVideoPlayerViewState extends State<_DesktopVideoPlayerView> {
 
     switch (event.logicalKey) {
       case LogicalKeyboardKey.space:
-        widget.playback.togglePlayPause();
+        unawaited(widget.playback.togglePlayPause());
         _showControls();
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowLeft:
-        widget.playback.skip(-_skipAmount);
+        unawaited(widget.playback.skip(-_skipAmount));
         _showControls();
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowRight:
-        widget.playback.skip(_skipAmount);
+        unawaited(widget.playback.skip(_skipAmount));
         _showControls();
         return KeyEventResult.handled;
 
@@ -222,7 +238,7 @@ class _DesktopVideoPlayerViewState extends State<_DesktopVideoPlayerView> {
         return KeyEventResult.ignored;
 
       case LogicalKeyboardKey.keyM:
-        widget.playback.toggleMute();
+        unawaited(widget.playback.toggleMute());
         _showControls();
         return KeyEventResult.handled;
 
@@ -271,7 +287,7 @@ class _DesktopVideoPlayerViewState extends State<_DesktopVideoPlayerView> {
         child: GestureDetector(
           onTap: () {
             if (_controlsVisible) {
-              widget.playback.togglePlayPause();
+              unawaited(widget.playback.togglePlayPause());
               _scheduleAutoHide();
             } else {
               _showControls();
@@ -446,6 +462,10 @@ class _BottomBar extends StatelessWidget {
 
     final volume = (value.volume / 200).clamp(0.0, 1.0);
 
+    final hasSubtitles =
+        playback.subtitleTracks.isNotEmpty ||
+        playback.embeddedSubtitleTracks.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 0, 12, 4),
       decoration: const BoxDecoration(
@@ -473,7 +493,9 @@ class _BottomBar extends StatelessWidget {
               onChanged: duration.inMilliseconds > 0
                   ? (v) {
                       onInteract();
-                      playback.seekTo(Duration(milliseconds: v.toInt()));
+                      unawaited(
+                        playback.seekTo(Duration(milliseconds: v.toInt())),
+                      );
                     }
                   : null,
             ),
@@ -487,7 +509,7 @@ class _BottomBar extends StatelessWidget {
                   color: Colors.white,
                 ),
                 onPressed: () {
-                  playback.togglePlayPause();
+                  unawaited(playback.togglePlayPause());
                   onInteract();
                 },
               ),
@@ -500,7 +522,7 @@ class _BottomBar extends StatelessWidget {
                 ),
                 tooltip: 'Back 10 seconds',
                 onPressed: () {
-                  playback.skip(const Duration(seconds: -10));
+                  unawaited(playback.skip(const Duration(seconds: -10)));
                   onInteract();
                 },
               ),
@@ -513,7 +535,7 @@ class _BottomBar extends StatelessWidget {
                 ),
                 tooltip: 'Forward 10 seconds',
                 onPressed: () {
-                  playback.skip(const Duration(seconds: 10));
+                  unawaited(playback.skip(const Duration(seconds: 10)));
                   onInteract();
                 },
               ),
@@ -525,44 +547,8 @@ class _BottomBar extends StatelessWidget {
 
               const Spacer(),
 
-              if (playback.subtitleTracks.isNotEmpty)
-                PopupMenuButton<SubtitleTrack?>(
-                  tooltip: 'Subtitles',
-                  icon: const Icon(
-                    Icons.subtitles,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  onSelected: (track) {
-                    playback.setSubtitleTrack(track);
-                    onInteract();
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<SubtitleTrack?>(
-                      value: null,
-                      child: Text(
-                        'Off',
-                        style: TextStyle(
-                          fontWeight: playback.activeSubtitleTrack == null
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                    for (final track in playback.subtitleTracks)
-                      PopupMenuItem<SubtitleTrack?>(
-                        value: track,
-                        child: Text(
-                          track.label,
-                          style: TextStyle(
-                            fontWeight: playback.activeSubtitleTrack == track
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+              if (hasSubtitles)
+                _SubtitleMenu(playback: playback, onInteract: onInteract),
 
               MouseRegion(
                 onEnter: (_) => onShowVolumeSlider(true),
@@ -580,7 +566,7 @@ class _BottomBar extends StatelessWidget {
                         size: 20,
                       ),
                       onPressed: () {
-                        playback.toggleMute();
+                        unawaited(playback.toggleMute());
                         onInteract();
                       },
                     ),
@@ -593,7 +579,7 @@ class _BottomBar extends StatelessWidget {
                               activeColor: Colors.white,
                               inactiveColor: Colors.white24,
                               onChanged: (v) {
-                                playback.setVolume(v);
+                                unawaited(playback.setVolume(v));
                                 onInteract();
                               },
                             )
@@ -618,4 +604,122 @@ class _BottomBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SubtitleMenu extends StatelessWidget {
+  const _SubtitleMenu({required this.playback, required this.onInteract});
+
+  final VlcVideoPlaybackController playback;
+  final VoidCallback onInteract;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_SubtitleSelection>(
+      tooltip: 'Subtitles',
+      icon: const Icon(Icons.subtitles, color: Colors.white, size: 20),
+      onSelected: (selection) {
+        switch (selection.type) {
+          case _SubtitleSelectionType.off:
+            unawaited(playback.disableSubtitles());
+
+          case _SubtitleSelectionType.external:
+            unawaited(playback.setSubtitleTrack(selection.externalTrack));
+
+          case _SubtitleSelectionType.embedded:
+            unawaited(
+              playback.setEmbeddedSubtitleTrack(selection.embeddedTrack),
+            );
+
+          case _SubtitleSelectionType.section:
+            return;
+        }
+
+        onInteract();
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<_SubtitleSelection>(
+          value: const _SubtitleSelection.off(),
+          child: Text(
+            'Off',
+            style: TextStyle(
+              fontWeight:
+                  playback.activeSubtitleTrack == null &&
+                      playback.activeEmbeddedSubtitleTrack == null
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+            ),
+          ),
+        ),
+
+        if (playback.subtitleTracks.isNotEmpty)
+          const PopupMenuItem<_SubtitleSelection>(
+            enabled: false,
+            value: _SubtitleSelection.section(),
+            child: Text('External'),
+          ),
+
+        for (final track in playback.subtitleTracks)
+          PopupMenuItem<_SubtitleSelection>(
+            value: _SubtitleSelection.external(track),
+            child: Row(
+              children: [
+                if (playback.activeSubtitleTrack == track)
+                  const Icon(Icons.check, size: 18)
+                else
+                  const SizedBox(width: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(track.label)),
+              ],
+            ),
+          ),
+
+        if (playback.embeddedSubtitleTracks.isNotEmpty)
+          const PopupMenuItem<_SubtitleSelection>(
+            enabled: false,
+            value: _SubtitleSelection.section(),
+            child: Text('Embedded'),
+          ),
+
+        for (final track in playback.embeddedSubtitleTracks)
+          PopupMenuItem<_SubtitleSelection>(
+            value: _SubtitleSelection.embedded(track),
+            child: Row(
+              children: [
+                if (playback.activeEmbeddedSubtitleTrack?.id == track.id)
+                  const Icon(Icons.check, size: 18)
+                else
+                  const SizedBox(width: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(track.label)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+enum _SubtitleSelectionType { off, external, embedded, section }
+
+class _SubtitleSelection {
+  const _SubtitleSelection._({
+    required this.type,
+    this.externalTrack,
+    this.embeddedTrack,
+  });
+
+  const _SubtitleSelection.off() : this._(type: _SubtitleSelectionType.off);
+
+  const _SubtitleSelection.external(SubtitleTrack track)
+    : this._(type: _SubtitleSelectionType.external, externalTrack: track);
+
+  const _SubtitleSelection.embedded(VlcEmbeddedSubtitleTrack track)
+    : this._(type: _SubtitleSelectionType.embedded, embeddedTrack: track);
+
+  const _SubtitleSelection.section()
+    : this._(type: _SubtitleSelectionType.section);
+
+  final _SubtitleSelectionType type;
+  final SubtitleTrack? externalTrack;
+  final VlcEmbeddedSubtitleTrack? embeddedTrack;
 }

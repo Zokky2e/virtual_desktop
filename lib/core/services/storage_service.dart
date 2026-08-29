@@ -18,6 +18,7 @@ abstract class StorageService {
     /// need it.
     String? fileName,
     void Function(double progress)? onProgress,
+    bool isShared = false,
   });
 
   Future<Either<Failure, Unit>> deleteFile(String path);

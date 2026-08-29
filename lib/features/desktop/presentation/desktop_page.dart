@@ -28,6 +28,7 @@ class DesktopPage extends StatelessWidget {
 
   void addNewFolder(BuildContext context) {
     final uid = getIt<AuthRepository>().currentUser!.uid;
+
     getIt<FileSystemRepository>().createFolder(
       name: 'New Folder',
       parentFolderId: null,
@@ -38,15 +39,16 @@ class DesktopPage extends StatelessWidget {
   Future<void> uploadFile(BuildContext context) async {
     final result = await FilePicker.platform.pickFiles(withData: true);
     final file = result?.files.single;
+
     if (file?.bytes == null) return;
+
     if (context.mounted) {
       context.read<UploadBloc>().add(
         UploadFileRequested(
           bytes: file!.bytes!,
           fileName: file.name,
           mimeType: mimeTypeForFileName(file.name),
-          parentFolderId:
-              null, // root only, per your folder-scoping decision — nested uploads land here once folder-browsing windows exist
+          parentFolderId: null,
         ),
       );
     }
@@ -74,44 +76,44 @@ class DesktopPage extends StatelessWidget {
         builder: (context) {
           return Scaffold(
             body: BlocListener<UploadBloc, UploadState>(
-              listener: (context, state) => {
-                if (state is UploadFailure)
-                  {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Upload failed: ${state.message}'),
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 64,
-                        ),
+              listener: (context, state) {
+                if (state is UploadFailure) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Upload failed: ${state.message}'),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        bottom: 64,
                       ),
                     ),
-                  }
-                else if (state is UploadSuccess)
-                  {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Uploaded ${state.item.name}'),
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          bottom: 64,
-                        ),
+                  );
+                } else if (state is UploadSuccess) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Uploaded ${state.item.name}'),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        bottom: 64,
                       ),
                     ),
-                  },
+                  );
+                }
               },
               child: BlocBuilder<DesktopBloc, DesktopState>(
                 builder: (context, state) {
                   return GestureDetector(
-                    onTap: () => context.read<DesktopBloc>().add(
-                      const DesktopSelectionCleared(),
-                    ),
+                    onTap: () {
+                      context.read<DesktopBloc>().add(
+                        const DesktopSelectionCleared(),
+                      );
+                    },
                     onSecondaryTapDown: (details) async {
                       final clipboard = context.read<FileClipboardCubit>();
+
                       final selection = await showMenu<String>(
                         context: context,
                         position: RelativeRect.fromLTRB(
@@ -136,8 +138,15 @@ class DesktopPage extends StatelessWidget {
                             ),
                         ],
                       );
-                      if (selection == 'new_folder') addNewFolder(context);
-                      if (selection == 'upload') uploadFile(context);
+
+                      if (selection == 'new_folder') {
+                        addNewFolder(context);
+                      }
+
+                      if (selection == 'upload') {
+                        uploadFile(context);
+                      }
+
                       if (selection == 'paste') {
                         await pasteClipboardItem(
                           context: context,
@@ -146,59 +155,77 @@ class DesktopPage extends StatelessWidget {
                         );
                       }
                     },
-                    child: Stack(
-                      children: [
-                        BlocBuilder<SettingsBloc, SettingsState>(
-                          builder: (context, settingsState) {
-                            final settings = settingsState is SettingsLoaded
-                                ? settingsState.settings
-                                : null;
-                            final backgroundDecoration =
-                                settings?.wallpaperType ==
-                                        WallpaperType.image &&
-                                    settings?.wallpaperImageUrl != null
-                                ? BoxDecoration(
-                                    image: DecorationImage(
-                                      image: adaptiveImageProvider(
-                                        settings!.wallpaperImageUrl!,
+                    child: SizedBox.expand(
+                      child: Stack(
+                        children: [
+                          // Wallpaper
+                          //
+                          // The wallpaper is isolated from the rest of the
+                          // desktop so overlays such as Tooltip should not
+                          // cause the wallpaper image to be repainted.
+                          Positioned.fill(
+                            child: RepaintBoundary(
+                              child: BlocBuilder<SettingsBloc, SettingsState>(
+                                builder: (context, settingsState) {
+                                  final settings =
+                                      settingsState is SettingsLoaded
+                                      ? settingsState.settings
+                                      : null;
+
+                                  if (settings?.wallpaperType ==
+                                          WallpaperType.image &&
+                                      settings?.wallpaperImageUrl != null) {
+                                    return DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        image: DecorationImage(
+                                          image: adaptiveImageProvider(
+                                            settings!.wallpaperImageUrl!,
+                                          ),
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : BoxDecoration(
+                                    );
+                                  }
+
+                                  return ColoredBox(
                                     color:
                                         settings?.wallpaperColor ??
                                         const Color(0xFF1E2A38),
                                   );
+                                },
+                              ),
+                            ),
+                          ),
 
-                            return Container(
-                              width: double.infinity,
-                              height: double.infinity,
-                              decoration: backgroundDecoration,
-                              padding: const EdgeInsets.only(bottom: 48),
-                              child: state.isLoading
-                                  ? const Center(
-                                      child: CircularProgressIndicator(),
-                                    )
-                                  : SingleChildScrollView(
-                                      padding: const EdgeInsets.all(16),
-                                      child: DesktopIconGrid(
-                                        items: state.items,
-                                        containerFolderId: null,
-                                        selectedItemIds: state.selectedItemIds,
-                                      ),
+                          // Desktop content
+                          Positioned.fill(
+                            bottom: 48,
+                            child: state.isLoading
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : SingleChildScrollView(
+                                    padding: const EdgeInsets.all(16),
+                                    child: DesktopIconGrid(
+                                      items: state.items,
+                                      containerFolderId: null,
+                                      selectedItemIds: state.selectedItemIds,
                                     ),
-                            );
-                          },
-                        ),
-                        const WindowsOverlay(),
-                        const Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: Taskbar(),
-                        ),
-                      ],
+                                  ),
+                          ),
+
+                          // Open windows
+                          const WindowsOverlay(),
+
+                          // Taskbar
+                          const Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: Taskbar(),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },

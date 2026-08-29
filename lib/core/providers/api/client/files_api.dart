@@ -21,6 +21,7 @@ class FilesApi {
     required String mimeType,
     required String? parentFolderId,
     void Function(double progress)? onProgress,
+    bool isShared = false,
   }) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(
@@ -32,9 +33,10 @@ class FilesApi {
     final res = await _client.dio.post(
       '$basePath/upload',
       data: formData,
-      queryParameters: parentFolderId != null
-          ? {'parent_folder_id': parentFolderId}
-          : null,
+      queryParameters: {
+        'parent_folder_id': ?parentFolderId,
+        'isShared': isShared,
+      },
       onSendProgress: (sent, total) {
         if (total > 0 && onProgress != null) onProgress(sent / total);
       },

@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:virtual_desktop/core/di/injector.dart';
-import 'package:virtual_desktop/core/models/wallpaper_item.dart';
 import 'package:virtual_desktop/core/repositories/auth_repository.dart';
 import 'package:virtual_desktop/core/repositories/wallpaper_repository.dart';
 import 'package:virtual_desktop/core/services/storage_service.dart';

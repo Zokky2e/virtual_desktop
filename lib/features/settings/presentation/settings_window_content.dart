@@ -6,7 +6,6 @@ import 'package:virtual_desktop/core/models/wallpaper_item.dart';
 import 'package:virtual_desktop/shared/widgets/adaptive_image_provider.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/app_settings.dart';
-import '../../../core/models/file_item.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/repositories/wallpaper_repository.dart';
 import '../../../core/services/storage_service.dart';

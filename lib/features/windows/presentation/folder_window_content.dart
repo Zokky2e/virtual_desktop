@@ -158,6 +158,7 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
         fileName: file.name,
         mimeType: mimeTypeForFileName(file.name),
         parentFolderId: _currentFolder.id,
+        isShared: widget.isShared,
       ),
     );
   }

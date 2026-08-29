@@ -22,6 +22,7 @@ class FakeStorageService implements StorageService {
     /// need it.
     String? fileName,
     void Function(double progress)? onProgress,
+    bool isShared = false,
   }) async {
     onProgress?.call(1.0);
     _store[path] = bytes;

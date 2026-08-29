@@ -306,7 +306,7 @@ class _DesktopVideoPlayerViewState extends State<_DesktopVideoPlayerView> {
                     child: VlcPlayer(
                       controller: _controller,
                       backgroundColor: Colors.black,
-                      fit: VlcVideoFit.contain,
+                      fit: VlcVideoFit.fill,
                     ),
                   ),
                 ),

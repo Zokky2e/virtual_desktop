@@ -31,6 +31,7 @@ class LocalWallpaperStorageService implements StorageService {
     String? parentFolderId,
     String? fileName,
     void Function(double progress)? onProgress,
+    bool isShared = false,
   }) async {
     try {
       final dir = await _wallpapersDir();

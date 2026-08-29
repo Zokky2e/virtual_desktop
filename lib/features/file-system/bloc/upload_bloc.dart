@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:virtual_desktop/core/di/injector.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/repositories/file_system_repository.dart';
@@ -26,7 +27,9 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
     UploadFileRequested event,
     Emitter<UploadState> emit,
   ) async {
-    final uid = _authRepository.currentUser?.uid;
+    final uid = event.isShared
+        ? sharedInstanceName
+        : _authRepository.currentUser?.uid;
     if (uid == null) {
       emit(const UploadFailure('Not signed in.'));
       return;
@@ -44,6 +47,7 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
       parentFolderId: event.parentFolderId,
       fileName: event.fileName,
       onProgress: (progress) => emit(UploadInProgress(progress)),
+      isShared: event.isShared,
     );
 
     await uploadResult.match(

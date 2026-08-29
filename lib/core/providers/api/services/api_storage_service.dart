@@ -30,6 +30,7 @@ class ApiStorageService implements StorageService {
     String? parentFolderId,
     String? fileName,
     void Function(double progress)? onProgress,
+    bool isShared = false,
   }) async {
     try {
       final json = await _filesApi.upload(
@@ -38,6 +39,7 @@ class ApiStorageService implements StorageService {
         mimeType: mimeType,
         parentFolderId: parentFolderId,
         onProgress: onProgress,
+        isShared: isShared,
       );
       return Right(json['id'] as String);
     } catch (e) {

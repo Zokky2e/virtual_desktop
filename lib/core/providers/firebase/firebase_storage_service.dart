@@ -18,6 +18,7 @@ class FirebaseStorageService implements StorageService {
     String? parentFolderId,
     String? fileName,
     void Function(double progress)? onProgress,
+    bool isShared = false,
   }) async {
     try {
       final ref = _storage.ref(path);

@@ -37,7 +37,19 @@ dependencies:
     web_socket_channel: ^3.0.0
     http_parser: ^4.0.2
     url_launcher: ^6.3.2
-    vlc_player: ^2.1.2
+    # Fork of vlc_player v2.1.2. Upstream's Windows plugin delivers
+    # event-channel messages from its polling thread, which the Flutter engine
+    # rejects ("sent a message from native to Flutter on a non-platform
+    # thread") and which deadlocks against Dispose()'s polling_thread_.join(),
+    # hanging the whole app around opening or closing a video.
+    #
+    # Branch fix/windows-event-channel-platform-thread, based on the v2.1.2
+    # tag. Pinned to a commit, not a branch, so builds stay reproducible.
+    # Drop the fork and go back to the hosted package if upstream fixes this.
+    vlc_player:
+        git:
+            url: https://github.com/Zokky2e/vlc_player.git
+            ref: 26ec2836bc35568c96a6d6ae8389d8e67e2ec1a1
 dev_dependencies:
     flutter_test:
         sdk: flutter

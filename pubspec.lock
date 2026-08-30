@@ -1080,10 +1080,11 @@ packages:
   vlc_player:
     dependency: "direct main"
     description:
-      name: vlc_player
-      sha256: "364bd860ae67577f69b70def62c8f51a06ca87f246d524fc2dc4ba195c02bf57"
-      url: "https://pub.dev"
-    source: hosted
+      path: "."
+      ref: "26ec2836bc35568c96a6d6ae8389d8e67e2ec1a1"
+      resolved-ref: "26ec2836bc35568c96a6d6ae8389d8e67e2ec1a1"
+      url: "https://github.com/Zokky2e/vlc_player.git"
+    source: git
     version: "2.1.2"
   vm_service:
     dependency: transitive

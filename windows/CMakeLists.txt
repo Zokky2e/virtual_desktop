@@ -106,3 +106,24 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# Precompute libVLC's plugin cache next to the executable.
+#
+# Without plugins.dat, libvlc_new() builds its module bank by loading every DLL
+# under plugins/. That costs ~200 ms with a warm file cache but ~20 s cold (a
+# fresh boot), and vlc_player does it synchronously on the Flutter platform
+# thread, so the app is frozen for the duration.
+#
+# This has to run as an install step rather than a custom target: the plugin's
+# own copy_directory targets rewrite the DLL timestamps, MSBuild runs them in
+# parallel with any target we could order against them, and a cache written
+# mid-copy is rejected by libVLC ("stale plugins cache: modified ..."). The
+# install step runs after every build target has finished, but MSBuild can
+# still interleave it with those copies, so it is best-effort: if libVLC logs
+# "stale plugins cache", run tool/refresh_vlc_cache.ps1 after the build to
+# regenerate it deterministically.
+install(CODE "
+  set(VLC_RUNTIME_SEARCH_DIR \"${CMAKE_BINARY_DIR}/plugins/vlc_player/vlc\")
+  set(BUNDLE_PLUGINS_DIR \"${BUILD_BUNDLE_DIR}/plugins\")
+  include(\"${CMAKE_CURRENT_SOURCE_DIR}/vlc_plugin_cache.cmake\")
+  " COMPONENT Runtime)

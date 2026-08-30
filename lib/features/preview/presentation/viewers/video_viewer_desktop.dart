@@ -7,6 +7,19 @@ import 'package:vlc_player/vlc_player.dart';
 import 'subtitle_models.dart';
 import 'vlc_video_playback_controller.dart';
 
+/// libVLC instance options.
+///
+/// S/PDIF passthrough hands the still-encoded bitstream to a receiver instead
+/// of decoding it. A windowed app rendering into a Flutter texture cannot use
+/// that, and negotiating it is what fails on E-AC-3 (DDP) tracks:
+///
+///   main audio output error: too low audio sample frequency (0)
+///   main decoder error: failed to create audio output
+///
+/// Turning it off makes VLC decode to PCM and go through the system mixer,
+/// which is the only thing this player can actually do with audio.
+const List<String> _vlcOptions = <String>['--no-spdif'];
+
 class VideoViewer extends StatefulWidget {
   const VideoViewer({
     super.key,
@@ -42,6 +55,7 @@ class _VideoViewerState extends State<VideoViewer> {
     _controller = VlcPlayerController(
       mediaSource: VlcMediaSource(uri: Uri.parse(widget.url)),
       autoPlay: true,
+      options: _vlcOptions,
     );
 
     _playback = VlcVideoPlaybackController(
@@ -52,7 +66,9 @@ class _VideoViewerState extends State<VideoViewer> {
 
   @override
   void dispose() {
-    _fullscreenOverlayController.hide();
+    if (_fullscreenOverlayController.isShowing) {
+      _fullscreenOverlayController.hide();
+    }
     _playback.dispose();
     super.dispose();
   }

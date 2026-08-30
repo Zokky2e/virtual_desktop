@@ -226,6 +226,31 @@ flutter analyze
 Requires a `.env` file (git-ignored) with at least `API_BASE_URL` and, for
 web, the `FIREBASE_*` keys read in `main.dart`.
 
+## Scanning for issues
+
+```
+dart run tool/scan.dart            # project-aware static scan
+dart run tool/scan.dart --analyze  # merge `flutter analyze` into the same report
+dart run tool/scan.dart --json     # machine-readable
+```
+
+`tool/scan.dart` encodes the rules in this file — layering, `get_it` instance
+names, platform-conditional file parity, disposal, `.env` force-unwraps — as
+checks the analyzer cannot express. Its header comment lists the flags; the
+groups are `arch`, `platform`, `lifecycle`, `runtime`, `hygiene`, and it exits
+1 when anything high-severity is present. Run it after changes that touch
+layering or the web/Windows split. When a bug class shows up twice, add a rule
+there rather than re-explaining it each session.
+
+The deeper pass is agent-driven: `/scan-issues` runs the static passes, then
+dispatches the `flutter-bug-hunter` (runtime races, wrong-tree reads, state
+bugs) and `flutter-arch-auditor` (convention drift, DI wiring, variant parity)
+agents and merges everything into one ranked report. Definitions live in
+`.claude/agents/`.
+
+Standing baseline: `test/widget_test.dart` is still the stale `flutter create`
+counter test and fails. It is a known failure, not a regression.
+
 ## Conventions to preserve when editing
 
 1. Never let a BLoC/Cubit import a provider implementation directly — only

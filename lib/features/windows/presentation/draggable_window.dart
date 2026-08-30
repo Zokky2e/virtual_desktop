@@ -21,18 +21,27 @@ class DraggableWindow extends StatelessWidget {
       top: window.position.dy,
       width: window.size.width,
       height: window.size.height,
-      child: GestureDetector(
-        onTapDown: (_) =>
-            context.read<WindowBloc>().add(WindowFocused(window.id)),
-        child: Material(
-          elevation: isFocused ? 12 : 4,
-          borderRadius: BorderRadius.circular(8),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              _TitleBar(window: window, isFocused: isFocused),
-              Expanded(child: window.contentBuilder(context)),
-            ],
+      // Offstage rather than absent: a minimized window keeps its element and
+      // State (folder back-stack, video position) but is not painted and does
+      // not hit-test. TickerMode stops its animations from running unseen.
+      child: Offstage(
+        offstage: window.isMinimized,
+        child: TickerMode(
+          enabled: !window.isMinimized,
+          child: GestureDetector(
+            onTapDown: (_) =>
+                context.read<WindowBloc>().add(WindowFocused(window.id)),
+            child: Material(
+              elevation: isFocused ? 12 : 4,
+              borderRadius: BorderRadius.circular(8),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _TitleBar(window: window, isFocused: isFocused),
+                  Expanded(child: window.contentBuilder(context)),
+                ],
+              ),
+            ),
           ),
         ),
       ),

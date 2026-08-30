@@ -21,11 +21,24 @@ class RecycleBinWindowContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = getIt<AuthRepository>().currentUser!.uid;
+    final user = getIt<AuthRepository>().currentUser;
+    if (user == null) {
+      // Signed out with the window still open — the router is about to send
+      // us back to login, so don't subscribe to a tree we can't read.
+      return const ColoredBox(
+        color: Color(0xFF25344A),
+        child: Center(
+          child: Text(
+            'Sign in to view the Recycle Bin',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    }
     return Container(
       color: const Color(0xFF25344A),
       child: StreamBuilder<List<FileItem>>(
-        stream: getIt<FileSystemRepository>().watchDeletedItems(uid),
+        stream: getIt<FileSystemRepository>().watchDeletedItems(user.uid),
         builder: (context, snapshot) {
           final items = snapshot.data ?? const [];
           if (!snapshot.hasData) {

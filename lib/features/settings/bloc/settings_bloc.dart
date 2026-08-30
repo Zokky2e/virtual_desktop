@@ -25,6 +25,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     SettingsLoadRequested event,
     Emitter<SettingsState> emit,
   ) async {
+    // Checked before load(): settings keys are scoped per user, so
+    // SettingsRepository itself can't answer with no signed-in user.
+    final user = getIt<AuthRepository>().currentUser;
+    if (user == null) {
+      // Signed out mid-load — emit defaults rather than throwing out of the
+      // event handler, which would leave Settings stuck on its spinner.
+      emit(const SettingsLoaded(AppSettings()));
+      return;
+    }
     var settings = await _settingsRepository.load();
     final wallpaperRepository = getIt<WallpaperRepository>(
       instanceName: wallpaperInstanceName,
@@ -32,9 +41,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final storageService = getIt<StorageService>(
       instanceName: wallpaperInstanceName,
     );
-    final authRepository = getIt<AuthRepository>();
     final wallpapers = await wallpaperRepository
-        .watchWallpapers(authRepository.currentUser!.uid)
+        .watchWallpapers(user.uid)
         .first;
     final matching = wallpapers.where((w) => w.isSet);
 

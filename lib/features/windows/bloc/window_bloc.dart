@@ -71,11 +71,29 @@ class WindowBloc extends Bloc<WindowEvent, WindowManagerState> {
     emit(state.copyWith(windows: updated));
   }
 
+  /// How much of a window must stay inside the top-left of the viewport for
+  /// its title bar to remain grabbable. The pan gesture keeps tracking after
+  /// the pointer leaves the window, so without this a window dragged above
+  /// the top edge lands at a negative y, outside the Stack's hit-test area —
+  /// unmovable and uncloseable for the rest of the session, since the taskbar
+  /// only toggles minimize.
+  static const _minVisibleWidth = 80.0;
+
   void _onMovedTo(WindowMovedTo event, Emitter<WindowManagerState> emit) {
     final index = state.windows.indexWhere((w) => w.id == event.id);
     if (index == -1) return;
     final updated = [...state.windows];
-    updated[index] = updated[index].copyWith(position: event.newPosition);
+    final size = updated[index].size;
+    // Only the top-left is clamped here: the bloc has no viewport size, and
+    // dragging off the right/bottom edge still leaves the title bar reachable.
+    final clamped = Offset(
+      event.newPosition.dx.clamp(
+        -(size.width - _minVisibleWidth),
+        double.infinity,
+      ),
+      event.newPosition.dy.clamp(0.0, double.infinity),
+    );
+    updated[index] = updated[index].copyWith(position: clamped);
     emit(state.copyWith(windows: updated));
   }
 

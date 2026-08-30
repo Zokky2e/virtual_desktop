@@ -22,10 +22,18 @@ class _SearchWindowContentState extends State<SearchWindowContent> {
       setState(() => _results = []);
       return;
     }
+    final user = getIt<AuthRepository>().currentUser;
+    // Signed out while the search window was open — nothing to search.
+    if (user == null) {
+      setState(() {
+        _isSearching = false;
+        _results = [];
+      });
+      return;
+    }
     setState(() => _isSearching = true);
-    final uid = getIt<AuthRepository>().currentUser!.uid;
     final result = await getIt<FileSystemRepository>().searchItems(
-      uid,
+      user.uid,
       query.trim(),
     );
     if (!mounted) return;

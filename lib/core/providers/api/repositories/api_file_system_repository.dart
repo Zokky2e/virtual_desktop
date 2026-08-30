@@ -246,8 +246,15 @@ class ApiFileSystemRepository implements FileSystemRepository {
   Future<Either<Failure, Unit>> reorder({
     required String itemId,
     required double newSortIndex,
-  }) {
-    // TODO: implement reorder
-    throw UnimplementedError();
+  }) async {
+    // The FastAPI backend has no reorder route yet (no /desktop/reorder in
+    // app/api/folders.py or files.py, and sort_index is never mapped in
+    // file_response_mapper.dart). Report it the way every other method on
+    // this interface reports failure — throwing escaped the Either contract
+    // and surfaced as an unhandled async error from the drag handler, so a
+    // drop on the desktop silently did nothing.
+    return Left(
+      FileSystemFailure('Reordering is not supported by this backend yet.'),
+    );
   }
 }

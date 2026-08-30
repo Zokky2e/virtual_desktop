@@ -34,9 +34,12 @@ class _AppState extends State<App> {
     super.initState();
     _authBloc = AuthBloc(authRepository: getIt<AuthRepository>())
       ..add(const AuthSubscriptionRequested());
-    _settingsBloc = SettingsBloc(
-      settingsRepository: getIt<SettingsRepository>(),
-    )..add(const SettingsLoadRequested());
+    // Deliberately NOT loaded here: settings keys are scoped per user, and
+    // no AuthRepository has a restored user yet this early — currentUser is
+    // still null on both platforms. The Authenticated transition below is
+    // the only point where a load can succeed. Until then the BlocBuilder
+    // falls back to ThemeMode.dark, which is the stored default anyway.
+    _settingsBloc = SettingsBloc(settingsRepository: getIt<SettingsRepository>());
 
     _clipboardCubit = FileClipboardCubit();
 

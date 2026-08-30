@@ -135,7 +135,9 @@ class VlcVideoPlaybackController extends ChangeNotifier {
       _volumeBeforeMute = clamped;
     }
 
-    // Keep the UI abstraction at 0..1 while VLC uses 0..200.
+    // Keep the UI abstraction at 0..1. VLC's own scale runs 0..200, where
+    // 100 is unamplified; 1.0 maps to 100 so the slider's maximum is normal
+    // full volume, not 2x amplification. Readers must divide by 100 to match.
     await controller.setVolume((clamped * 100).round());
   }
 

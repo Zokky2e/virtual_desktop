@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:virtual_desktop/app/app.dart';
 import 'package:virtual_desktop/core/di/injector.dart';
+import 'package:virtual_desktop/shared/utils/env.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,13 +33,13 @@ Future<void> main() async {
   if (kIsWeb) {
     await Firebase.initializeApp(
       options: FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_API_KEY']!,
-        appId: dotenv.env['FIREBASE_APP_ID']!,
-        messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID']!,
-        projectId: dotenv.env['FIREBASE_PROJECT_ID']!,
-        authDomain: dotenv.env['FIREBASE_AUTH_DOMAIN'],
-        storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET'],
-        measurementId: dotenv.env['FIREBASE_MEASUREMENT_ID'],
+        apiKey: requireEnv('FIREBASE_API_KEY'),
+        appId: requireEnv('FIREBASE_APP_ID'),
+        messagingSenderId: requireEnv('FIREBASE_MESSAGING_SENDER_ID'),
+        projectId: requireEnv('FIREBASE_PROJECT_ID'),
+        authDomain: optionalEnv('FIREBASE_AUTH_DOMAIN'),
+        storageBucket: optionalEnv('FIREBASE_STORAGE_BUCKET'),
+        measurementId: optionalEnv('FIREBASE_MEASUREMENT_ID'),
       ),
     );
   }

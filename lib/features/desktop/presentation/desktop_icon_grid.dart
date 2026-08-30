@@ -1,6 +1,8 @@
 // lib/features/desktop/presentation/desktop_icon_grid.dart
 import 'package:flutter/material.dart';
+import 'package:fpdart/fpdart.dart';
 import '../../../core/di/injector.dart';
+import '../../../core/error/failure.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
 import '../../../shared/utils/sort_index.dart';
@@ -14,8 +16,12 @@ import 'desktop_icon.dart';
 /// [FileSystemRepository.move] (crossing folders — appended to the end,
 /// same as your existing cut/paste move) or a
 /// [FileSystemRepository.reorder] (same folder, positioned where dropped).
-/// DesktopPage and FolderWindowContent both delegate here instead of
-/// duplicating the drop logic.
+///
+/// Only [DesktopPage] mounts this today — FolderWindowContent builds its own
+/// Wrap of [DesktopIcon]s. [fileSystemRepository] exists so it *can* be
+/// reused for the shared tree (the FolderWindowContent injection pattern):
+/// without it, every drop would resolve the unnamed personal registration and
+/// a shared item would be moved via the caller's own uid, which 404s.
 class DesktopIconGrid extends StatelessWidget {
   const DesktopIconGrid({
     super.key,
@@ -24,6 +30,7 @@ class DesktopIconGrid extends StatelessWidget {
     this.selectedItemIds = const {},
     this.onFolderDoubleTap,
     this.iconColor = Colors.white,
+    this.fileSystemRepository,
   });
 
   final List<FileItem> items;
@@ -32,13 +39,25 @@ class DesktopIconGrid extends StatelessWidget {
   final void Function(FileItem folder)? onFolderDoubleTap;
   final Color iconColor;
 
-  Future<void> _dropBefore(FileItem dragged, FileItem? before) async {
+  /// Tree these drops act on. Defaults to the unnamed (personal)
+  /// registration, so DesktopPage is unaffected.
+  final FileSystemRepository? fileSystemRepository;
+
+  FileSystemRepository get _repo =>
+      fileSystemRepository ?? getIt<FileSystemRepository>();
+
+  Future<void> _dropBefore(
+    BuildContext context,
+    FileItem dragged,
+    FileItem? before,
+  ) async {
     if (dragged.id == before?.id) return;
 
-    final repo = getIt<FileSystemRepository>();
+    final repo = _repo;
 
     if (dragged.parentFolderId != containerFolderId) {
-      await repo.move(dragged.id, containerFolderId);
+      final result = await repo.move(dragged.id, containerFolderId);
+      if (context.mounted) _reportFailure(context, result);
       return;
     }
 
@@ -59,22 +78,39 @@ class DesktopIconGrid extends StatelessWidget {
         ? siblingsExcludingDragged[insertAt].sortIndex
         : null;
 
-    await repo.reorder(
+    final result = await repo.reorder(
       itemId: dragged.id,
       newSortIndex: sortIndexBetween(prev, next),
     );
+    if (context.mounted) _reportFailure(context, result);
     assert(before == null || beforeIndex != -1);
   }
 
-  Future<void> _dropInto(FileItem dragged, FileItem folder) async {
+  Future<void> _dropInto(
+    BuildContext context,
+    FileItem dragged,
+    FileItem folder,
+  ) async {
     if (dragged.id == folder.id) return;
-    await getIt<FileSystemRepository>().move(dragged.id, folder.id);
+    final result = await _repo.move(dragged.id, folder.id);
+    if (context.mounted) _reportFailure(context, result);
+  }
+
+  /// Drops used to swallow their result: a `move` that 404'd or a `reorder`
+  /// the backend doesn't implement just made the icon snap back with no
+  /// explanation. Say so instead.
+  void _reportFailure(BuildContext context, Either<Failure, Unit> result) {
+    result.match((failure) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.showSnackBar(SnackBar(content: Text(failure.message)));
+    }, (_) {});
   }
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<FileItem>(
-      onAcceptWithDetails: (details) => _dropBefore(details.data, null),
+      onAcceptWithDetails: (details) =>
+          _dropBefore(context, details.data, null),
       builder: (context, candidateData, rejectedData) {
         return Wrap(
           spacing: 16,
@@ -89,9 +125,9 @@ class DesktopIconGrid extends StatelessWidget {
                 onFolderDoubleTap: item.isFolder && onFolderDoubleTap != null
                     ? () => onFolderDoubleTap!(item)
                     : null,
-                onDropBefore: (dragged) => _dropBefore(dragged, item),
+                onDropBefore: (dragged) => _dropBefore(context, dragged, item),
                 onDropInto: item.isFolder
-                    ? (dragged) => _dropInto(dragged, item)
+                    ? (dragged) => _dropInto(context, dragged, item)
                     : null,
               ),
           ],

@@ -66,8 +66,6 @@ class FirestoreWallpaperRepository implements WallpaperRepository {
       await docRef.set(item.toFirestore());
       return Right(item);
     } catch (e) {
-      // ignore: avoid_print
-      print('saveWallpaper failed: $e');
       return Left(FileSystemFailure(e.toString()));
     }
   }

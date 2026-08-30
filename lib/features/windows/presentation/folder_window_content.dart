@@ -135,11 +135,14 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
   }
 
   Future<void> _createFolder() async {
-    final uid = getIt<AuthRepository>().currentUser!.uid;
+    final user = getIt<AuthRepository>().currentUser;
+    // A sign-out can land between the menu opening and this tap; creating a
+    // folder with no owner would fail server-side anyway.
+    if (user == null) return;
     await _repo.createFolder(
       name: 'New Folder',
       parentFolderId: _currentFolder.id,
-      ownerId: uid,
+      ownerId: user.uid,
     );
   }
 

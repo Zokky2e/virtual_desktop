@@ -27,7 +27,11 @@ class DesktopPage extends StatelessWidget {
   const DesktopPage({super.key});
 
   void addNewFolder(BuildContext context) {
-    final uid = getIt<AuthRepository>().currentUser!.uid;
+    final user = getIt<AuthRepository>().currentUser;
+    // A sign-out can land between the menu opening and this tap; creating a
+    // folder with no owner would fail server-side anyway.
+    if (user == null) return;
+    final uid = user.uid;
 
     getIt<FileSystemRepository>().createFolder(
       name: 'New Folder',

@@ -1,4 +1,3 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get_it/get_it.dart';
 import 'package:virtual_desktop/core/providers/api/client/api_client.dart';
 import 'package:virtual_desktop/core/providers/api/client/api_websocket_client.dart';
@@ -18,6 +17,7 @@ import '../services/storage_service.dart';
 import '../repositories/wallpaper_repository.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:virtual_desktop/core/providers/rest/rest_firebase_auth_repository.dart';
+import 'package:virtual_desktop/shared/utils/env.dart';
 
 final getIt = GetIt.instance;
 
@@ -33,23 +33,41 @@ const wallpaperInstanceName = 'wallpaper';
 
 Future<String?> _currentIdToken() => getIt<AuthRepository>().getIdToken();
 
+/// Owner id for per-user settings keys. Settings are only ever read behind
+/// the router's auth guard, so a null user here means the guard was bypassed
+/// or a sign-out raced the read — fail with a message that says which,
+/// rather than a bare null-check error from inside SharedPreferences.
+String _currentOwnerId() {
+  final user = getIt<AuthRepository>().currentUser;
+  if (user == null) {
+    throw StateError(
+      'Settings were read with no signed-in user. Settings keys are scoped '
+      'per user, so there is no correct key to use here — the caller should '
+      'be behind the auth guard.',
+    );
+  }
+  return user.uid;
+}
+
 void setupDependencies() {
   if (kIsWeb) {
     getIt.registerLazySingleton<AuthRepository>(() => FirebaseAuthRepository());
   } else {
     getIt.registerLazySingleton<AuthRepository>(
-      () => RestFirebaseAuthRepository(apiKey: dotenv.env['FIREBASE_API_KEY']!),
+      () => RestFirebaseAuthRepository(apiKey: requireEnv('FIREBASE_API_KEY')),
     );
   }
 
+  final apiBaseUrl = requireEnv('API_BASE_URL');
+
   final apiClient = ApiClient(
-    baseUrl: dotenv.env['API_BASE_URL']!,
+    baseUrl: apiBaseUrl,
     getIdToken:
         _currentIdToken, // was _currentFirebaseIdToken — now provider-agnostic
   );
 
   final wsClient = ApiWebSocketClient(
-    baseUrl: dotenv.env['API_BASE_URL']!,
+    baseUrl: apiBaseUrl,
     getIdToken: _currentIdToken,
   );
 
@@ -98,7 +116,7 @@ void setupDependencies() {
 
   getIt.registerLazySingleton<SettingsRepository>(
     () => SharedPrefsSettingsRepository(
-      getCurrentOwnerId: () => getIt<AuthRepository>().currentUser!.uid,
+      getCurrentOwnerId: _currentOwnerId,
     ),
   );
   if (kIsWeb) {

@@ -476,7 +476,11 @@ class _BottomBar extends StatelessWidget {
         .clamp(0, sliderMax.toInt())
         .toDouble();
 
-    final volume = (value.volume / 200).clamp(0.0, 1.0);
+    // VlcPlayerValue.volume runs 0..200 (100 = unamplified), but
+    // VlcVideoPlaybackController.setVolume and toggleMute both map the UI's
+    // 0..1 onto 0..100. Reading it back at /200 made the slider snap to half
+    // whatever the user dragged it to, capping the display at 50%.
+    final volume = (value.volume / 100).clamp(0.0, 1.0);
 
     final hasSubtitles =
         playback.subtitleTracks.isNotEmpty ||

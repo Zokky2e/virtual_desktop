@@ -223,8 +223,12 @@ flutter test
 flutter analyze
 ```
 
-Requires a `.env` file (git-ignored) with at least `API_BASE_URL` and, for
-web, the `FIREBASE_*` keys read in `main.dart`.
+Requires a `.env` file (git-ignored) with at least `API_BASE_URL` and
+`FIREBASE_API_KEY` — the latter is needed on **both** targets, not just web:
+`RestFirebaseAuthRepository` (the Windows auth path) takes it too. The
+remaining `FIREBASE_*` keys read in `main.dart` are web-only. Read required
+keys through `requireEnv()` in `lib/shared/utils/env.dart`, which names the
+missing key instead of throwing a bare null-check error at startup.
 
 ## Scanning for issues
 

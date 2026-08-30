@@ -1,0 +1,89 @@
+{
+	// ---------------------------------------------------------------
+	// Platform scope: this project ships Web + Windows only.
+	// android/ and ios/ are kept on disk (tracked in git) but disabled
+	// so no tooling imports, indexes, builds or watches them.
+	// To re-enable: delete this block and the one in the .code-workspace.
+	// ---------------------------------------------------------------
+
+	// Hide the disabled platforms from the Explorer.
+	// Remove these two lines if you want to see the folders again.
+	"files.exclude": {
+		"android": true,
+		"ios": true
+	},
+
+	// Never spend a file watcher on them (or on generated output).
+	"files.watcherExclude": {
+		"**/android/**": true,
+		"**/ios/**": true,
+		"**/build/**": true,
+		"**/.dart_tool/**": true,
+		"**/flutter/ephemeral/**": true
+	},
+
+	// Keep them out of search results.
+	"search.exclude": {
+		"android": true,
+		"ios": true,
+		"**/build": true,
+		"**/flutter/ephemeral": true
+	},
+
+	// Dart analysis server: don't walk the disabled platform trees.
+	"dart.analysisExcludedFolders": [
+		"android",
+		"ios"
+	],
+
+	// Gradle task auto-detection (resource-scoped, so it belongs here).
+	"gradle.autoDetect": "off",
+
+	// Java settings are window-scoped: these apply when this folder is
+	// opened directly. The multi-root workspace needs its own copy,
+	// which lives in virtual-desktop-suite.code-workspace.
+	"java.import.gradle.enabled": false,
+	"java.import.maven.enabled": false,
+	"java.gradle.buildServer.enabled": "off",
+	"java.autobuild.enabled": false,
+	"java.import.projectSelection": "manual",
+	"java.import.exclusions": [
+		"**/node_modules/**",
+		"**/.metadata/**",
+		"**/archetype-resources/**",
+		"**/META-INF/maven/**",
+		"**/android/**",
+		"**/ios/**",
+		"**/build/**",
+		"**/flutter/ephemeral/**"
+	],
+
+	"workbench.colorCustomizations": {
+		"activityBar.activeBackground": "#256c4d",
+		"activityBar.background": "#256c4d",
+		"activityBar.foreground": "#e7e7e7",
+		"activityBar.inactiveForeground": "#e7e7e799",
+		"activityBarBadge.background": "#44215f",
+		"activityBarBadge.foreground": "#e7e7e7",
+		"activityBarTop.activeBackground": "#256c4d",
+		"activityBarTop.background": "#256c4d",
+		"activityBarTop.foreground": "#e7e7e7",
+		"activityBarTop.inactiveForeground": "#e7e7e799",
+		"commandCenter.border": "#e7e7e799",
+		"commandCenter.foreground": "#e7e7e7",
+		"sash.hoverBorder": "#256c4d",
+		"statusBar.background": "#184632",
+		"statusBar.debuggingBackground": "#184632",
+		"statusBar.debuggingForeground": "#e7e7e7",
+		"statusBar.foreground": "#e7e7e7",
+		"statusBarItem.hoverBackground": "#256c4d",
+		"statusBarItem.remoteBackground": "#9759c6",
+		"statusBarItem.remoteForeground": "#e7e7e7",
+		"titleBar.activeBackground": "#184632",
+		"titleBar.activeForeground": "#e7e7e7",
+		"titleBar.inactiveBackground": "#18463299",
+		"titleBar.inactiveForeground": "#e7e7e799",
+		"sideBar.background": "#000000"
+	},
+	"peacock.color": "#184632"
+}

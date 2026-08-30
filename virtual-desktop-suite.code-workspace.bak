@@ -1,0 +1,41 @@
+{
+	"folders": [
+		{
+			"name": "virtual_desktop (Flutter frontend)",
+			"path": "."
+		},
+		{
+			"name": "virtual-api (FastAPI backend)",
+			"path": "../virtual-api"
+		}
+	],
+	"settings": {
+		"workbench.colorCustomizations": {
+			"activityBar.activeBackground": "#6e2309",
+			"activityBar.background": "#6e2309",
+			"activityBar.foreground": "#e7e7e7",
+			"activityBar.inactiveForeground": "#e7e7e799",
+			"activityBarBadge.background": "#0c932f",
+			"activityBarBadge.foreground": "#e7e7e7",
+			"activityBarTop.activeBackground": "#6e2309",
+			"activityBarTop.background": "#6e2309",
+			"activityBarTop.foreground": "#e7e7e7",
+			"activityBarTop.inactiveForeground": "#e7e7e799",
+			"commandCenter.border": "#e7e7e799",
+			"commandCenter.foreground": "#e7e7e7",
+			"sash.hoverBorder": "#6e2309",
+			"statusBar.background": "#3f1405",
+			"statusBar.debuggingBackground": "#3f1405",
+			"statusBar.debuggingForeground": "#e7e7e7",
+			"statusBar.foreground": "#e7e7e7",
+			"statusBarItem.hoverBackground": "#6e2309",
+			"statusBarItem.remoteBackground": "#097626",
+			"statusBarItem.remoteForeground": "#e7e7e7",
+			"titleBar.activeBackground": "#3f1405",
+			"titleBar.activeForeground": "#e7e7e7",
+			"titleBar.inactiveBackground": "#3f140599",
+			"titleBar.inactiveForeground": "#e7e7e799"
+		},
+		"peacock.color": "#3f1405"
+	}
+}

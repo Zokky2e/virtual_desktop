@@ -221,4 +221,9 @@ class FakeFileSystemRepository implements FileSystemRepository {
     );
     return Right(exists);
   }
+
+  /// No-op: the fake's store is this object's own map, so there is nothing to
+  /// reconcile against.
+  @override
+  Future<Either<Failure, Unit>> sync() async => const Right(unit);
 }

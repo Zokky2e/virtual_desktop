@@ -262,4 +262,9 @@ class FirestoreFileSystemRepository implements FileSystemRepository {
       return Left(FileSystemFailure(e.toString()));
     }
   }
+
+  /// No-op: Firestore is the only writer of this tree, so it cannot drift out
+  /// of sync with itself.
+  @override
+  Future<Either<Failure, Unit>> sync() async => const Right(unit);
 }

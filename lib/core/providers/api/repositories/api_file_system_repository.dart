@@ -220,6 +220,19 @@ class ApiFileSystemRepository implements FileSystemRepository {
     );
   }
 
+  /// Backed by `POST {basePath}/sync`, which the backend only defines under
+  /// `/desktop/shared`. On the personal registration this resolves to
+  /// `/desktop/sync`, which does not exist, and comes back as a Failure.
+  @override
+  Future<Either<Failure, Unit>> sync() async {
+    try {
+      await _foldersApi.sync();
+      return const Right(unit);
+    } catch (e) {
+      return Left(FileSystemFailure(_describe(e)));
+    }
+  }
+
   String _describe(Object e) {
     if (e is DioException) {
       final data = e.response?.data;

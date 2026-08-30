@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:virtual_desktop/core/di/injector.dart';
-import 'package:virtual_desktop/core/providers/api/client/folders_api.dart';
 import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
 import 'package:virtual_desktop/core/services/storage_service.dart';
 import 'package:virtual_desktop/features/file-system/presentation/recycle_bin_window_content.dart';
@@ -77,8 +76,6 @@ class Taskbar extends StatelessWidget {
                 storageService: getIt<StorageService>(
                   instanceName: sharedInstanceName,
                 ),
-                onSync: () =>
-                    getIt<FoldersApi>(instanceName: sharedInstanceName).sync(),
               ),
             ),
           ),

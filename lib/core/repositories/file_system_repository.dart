@@ -55,4 +55,17 @@ abstract class FileSystemRepository {
     required String? parentFolderId,
     required String name,
   });
+
+  /// Reconciles the tree with items that appeared in the backing store
+  /// out-of-band — files dropped into the server's storage folder over scp or
+  /// wget, say, that no client ever announced.
+  ///
+  /// Only the shared tree can actually drift, and only its backend exposes the
+  /// endpoint (`POST /desktop/shared/sync`); the personal API registration
+  /// returns a `Failure` because no `/desktop/sync` route exists. Providers
+  /// whose store cannot drift at all — Firestore, the in-memory fake — return
+  /// `unit` without doing any work. Callers therefore never have to ask which
+  /// provider is behind the interface, but only the shared tree should offer
+  /// this as a user-facing action.
+  Future<Either<Failure, Unit>> sync();
 }

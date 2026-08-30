@@ -27,7 +27,6 @@ class FolderWindowContent extends StatefulWidget {
     this.isShared = false,
     this.fileSystemRepository,
     this.storageService,
-    this.onSync,
   }) : assert(
          rootFolder != null || rootTitle != null,
          'Provide either rootFolder (a real personal subfolder) or '
@@ -64,10 +63,6 @@ class FolderWindowContent extends StatefulWidget {
   /// passes the 'shared'-named instances instead.
   final FileSystemRepository? fileSystemRepository;
   final StorageService? storageService;
-
-  /// Calls POST /desktop/shared/sync on the server. Only meaningful (and
-  /// only shown) when [isShared] is true.
-  final Future<void> Function()? onSync;
 
   @override
   State<FolderWindowContent> createState() => _FolderWindowContentState();
@@ -163,34 +158,25 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
     );
   }
 
+  /// Reconciles this tree with files that reached the server out-of-band.
+  /// Only offered on the shared tree, where that can actually happen.
   Future<void> _sync() async {
-    final onSync = widget.onSync;
-    if (onSync == null || _isSyncing) return;
+    if (_isSyncing) return;
     setState(() => _isSyncing = true);
-    try {
-      await onSync();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Synced with server'),
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(left: 16, right: 16, bottom: 64),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sync failed: $e'),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSyncing = false);
-    }
+    final result = await _repo.sync();
+    if (!mounted) return;
+    setState(() => _isSyncing = false);
+    final message = result.match(
+      (failure) => 'Sync failed: ${failure.message}',
+      (_) => 'Synced with server',
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
+      ),
+    );
   }
 
   @override

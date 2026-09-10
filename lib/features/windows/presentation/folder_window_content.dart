@@ -10,6 +10,7 @@ import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cu
 import 'package:virtual_desktop/features/windows/bloc/window_state.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
+import 'package:virtual_desktop/shared/widgets/file_item_drop.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
@@ -199,23 +200,28 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
     );
   }
 
-  /// Handles a drop into this window's current folder.
-  ///
-  /// The cross-tree check comes first: the backend has no move between
-  /// the personal and shared trees, so this used to fire a request that
-  /// 404'd and then discard the result, which read as the drag silently
-  /// not working. The same is true of an ordinary failure, which was also
-  /// being thrown away.
-  Future<void> _acceptDrop(FileItem dragged) async {
-    if (isCrossTreeTransfer(
-      item: dragged,
-      isSharedDestination: widget.isShared,
-    )) {
-      _showMessage(crossTreeTransferMessage);
+  /// Handles a drop anywhere in this window: a move into the folder it is
+  /// currently showing, from this tree or the other one, once the user has
+  /// confirmed it — see [confirmAndMoveDroppedItem].
+  Future<void> _acceptDrop(DraggedFileItem dragged) async {
+    // A folder dropped into the window that is browsing it, or browsing a
+    // subfolder of it this window navigated into. The server refuses that
+    // too, but only after the user had been asked to confirm a move that
+    // could never succeed.
+    if (_folderStack.any((entry) => entry.id == dragged.item.id)) {
+      _showMessage(
+        "A folder can't be moved into itself or one of its own subfolders.",
+      );
       return;
     }
-    final result = await _repo.move(dragged.id, _currentFolder.id);
-    result.match((failure) => _showMessage(failure.message), (_) {});
+    await confirmAndMoveDroppedItem(
+      context: context,
+      dragged: dragged,
+      destinationFolderId: _currentFolder.id,
+      destinationFolderName: _currentFolder.name,
+      isSharedDestination: widget.isShared,
+      fileSystemRepository: _repo,
+    );
   }
 
   void _showMessage(String message) {
@@ -323,27 +329,32 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                 child: StreamBuilder<List<FileItem>>(
                   stream: _folderStream,
                   builder: (context, snapshot) {
-                    final items = snapshot.data ?? const [];
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (items.isEmpty) {
-                      return Center(
-                        child: Text(
-                          widget.isShared
-                              ? 'Nothing here yet — upload a file or hit Sync'
-                              : 'This folder is empty',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          ),
-                        ),
-                      );
-                    }
-                    return DragTarget<FileItem>(
-                      // Empty space inside this folder window — drop lands in this folder.
+                    // The whole listing is the drop target, in every state.
+                    // It used to be built only once there were items to
+                    // show, so an empty folder — a new one, or an empty
+                    // Shared window — refused every drop.
+                    return DragTarget<DraggedFileItem>(
                       onAcceptWithDetails: (details) =>
                           _acceptDrop(details.data),
                       builder: (context, candidateData, rejectedData) {
+                        final items = snapshot.data ?? const [];
+                        if (!snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Text(
+                              widget.isShared
+                                  ? 'Nothing here yet — upload a file or hit Sync'
+                                  : 'This folder is empty',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                          );
+                        }
                         return GestureDetector(
                           onSecondaryTapDown: (details) async {
                             final clipboard = context
@@ -403,6 +414,7 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                                     isSelected: false,
                                     fileSystemRepository: _repo,
                                     storageService: _storage,
+                                    sourceFolderName: _currentFolder.name,
                                     onFolderDoubleTap: item.isFolder
                                         ? () => _openSubfolder(item)
                                         : null,

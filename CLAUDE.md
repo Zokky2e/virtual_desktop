@@ -256,8 +256,12 @@ more):
   because storage keys are owner-prefixed (so a move relocates them) and
   because these are the same multi-GB videos the streaming endpoints exist
   for.
-  Cut/copy + Paste crosses trees; **drag-and-drop still doesn't** — a drop has
-  no way to say copy-or-move, which cut/copy has already answered.
+  Cut/copy + Paste and drag-and-drop both cross trees. **A drop is always a
+  move, and always asks first**: `confirmAndMoveDroppedItem` in
+  `shared/widgets/file_item_drop.dart` is the one path every drop target goes
+  through, within a tree or across. Nothing moves optimistically, so Cancel
+  leaves the item where it was. The only drop that doesn't ask is a reorder
+  within the same folder, since nothing changes location.
 - Recursive folder copy is intentionally unsupported (`pasteClipboardItem`) —
   this is a deliberate scope cut, not a bug.
 

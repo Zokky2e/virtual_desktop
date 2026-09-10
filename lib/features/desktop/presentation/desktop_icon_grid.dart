@@ -6,17 +6,18 @@ import '../../../core/error/failure.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
 import '../../../shared/utils/sort_index.dart';
-import '../../../shared/widgets/file_item_actions.dart';
+import '../../../shared/widgets/file_item_drop.dart';
 import 'desktop_icon.dart';
 
 /// Renders [items] as a wrap of draggable icons that can be reordered
 /// within [containerFolderId] (null = desktop root), or receive items
-/// dragged in from another folder or the desktop.
+/// dragged in from another folder, from the other tree, or from search.
 ///
-/// This is the one place that turns a drop into either a
-/// [FileSystemRepository.move] (crossing folders — appended to the end,
-/// same as your existing cut/paste move) or a
-/// [FileSystemRepository.reorder] (same folder, positioned where dropped).
+/// This is the one place that turns a drop here into either a move —
+/// confirmed first by [confirmAndMoveDroppedItem], and appended to the end
+/// the same as a cut/paste move — or a [FileSystemRepository.reorder]
+/// (same folder, positioned where dropped, and not asked about: nothing
+/// changes location).
 ///
 /// Only [DesktopPage] mounts this today — FolderWindowContent builds its own
 /// Wrap of [DesktopIcon]s. [fileSystemRepository] exists so it *can* be
@@ -28,6 +29,7 @@ class DesktopIconGrid extends StatelessWidget {
     super.key,
     required this.items,
     required this.containerFolderId,
+    this.containerFolderName = 'Desktop',
     this.selectedItemIds = const {},
     this.onFolderDoubleTap,
     this.iconColor = Colors.white,
@@ -37,6 +39,11 @@ class DesktopIconGrid extends StatelessWidget {
 
   final List<FileItem> items;
   final String? containerFolderId;
+
+  /// What the move confirmation calls [containerFolderId], and where an
+  /// icon dragged out of this grid says it came from.
+  final String containerFolderName;
+
   final Set<String> selectedItemIds;
   final void Function(FileItem folder)? onFolderDoubleTap;
   final Color iconColor;
@@ -45,9 +52,9 @@ class DesktopIconGrid extends StatelessWidget {
   /// registration, so DesktopPage is unaffected.
   final FileSystemRepository? fileSystemRepository;
 
-  /// Whether this grid is showing the shared tree. Only used to reject a
-  /// drop coming from the other tree — [fileSystemRepository] is what
-  /// actually decides which tree an accepted drop acts on.
+  /// Whether this grid is showing the shared tree, which decides whether a
+  /// drop crosses between trees. [fileSystemRepository] is still what serves
+  /// a drop that doesn't.
   final bool isSharedTree;
 
   FileSystemRepository get _repo =>
@@ -55,17 +62,18 @@ class DesktopIconGrid extends StatelessWidget {
 
   Future<void> _dropBefore(
     BuildContext context,
-    FileItem dragged,
+    DraggedFileItem dragged,
     FileItem? before,
   ) async {
-    if (dragged.id == before?.id) return;
-    if (_rejectCrossTree(context, dragged)) return;
+    final item = dragged.item;
+    if (item.id == before?.id) return;
 
-    final repo = _repo;
-
-    if (dragged.parentFolderId != containerFolderId) {
-      final result = await repo.move(dragged.id, containerFolderId);
-      if (context.mounted) _reportFailure(context, result);
+    if (!isAlreadyInFolder(
+      item: item,
+      folderId: containerFolderId,
+      isSharedDestination: isSharedTree,
+    )) {
+      await _move(context, dragged, containerFolderId, containerFolderName);
       return;
     }
 
@@ -73,7 +81,7 @@ class DesktopIconGrid extends StatelessWidget {
         ? -1
         : items.indexWhere((i) => i.id == before.id);
     final siblingsExcludingDragged = items
-        .where((i) => i.id != dragged.id)
+        .where((i) => i.id != item.id)
         .toList();
     final insertAt = before == null
         ? siblingsExcludingDragged.length
@@ -86,8 +94,8 @@ class DesktopIconGrid extends StatelessWidget {
         ? siblingsExcludingDragged[insertAt].sortIndex
         : null;
 
-    final result = await repo.reorder(
-      itemId: dragged.id,
+    final result = await _repo.reorder(
+      itemId: item.id,
       newSortIndex: sortIndexBetween(prev, next),
     );
     if (context.mounted) _reportFailure(context, result);
@@ -96,35 +104,30 @@ class DesktopIconGrid extends StatelessWidget {
 
   Future<void> _dropInto(
     BuildContext context,
-    FileItem dragged,
+    DraggedFileItem dragged,
     FileItem folder,
   ) async {
-    if (dragged.id == folder.id) return;
-    if (_rejectCrossTree(context, dragged)) return;
-    final result = await _repo.move(dragged.id, folder.id);
-    if (context.mounted) _reportFailure(context, result);
+    if (dragged.item.id == folder.id) return;
+    await _move(context, dragged, folder.id, folder.name);
   }
 
-  /// True when the drop was refused. Checked before any request goes out:
-  /// dragging a shared item onto the personal desktop (or the reverse)
-  /// used to issue a move() that 404'd, which read as the drag simply not
-  /// working.
-  bool _rejectCrossTree(BuildContext context, FileItem dragged) {
-    if (!isCrossTreeTransfer(
-      item: dragged,
-      isSharedDestination: isSharedTree,
-    )) {
-      return false;
-    }
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(const SnackBar(content: Text(crossTreeTransferMessage)));
-    return true;
-  }
+  Future<void> _move(
+    BuildContext context,
+    DraggedFileItem dragged,
+    String? destinationFolderId,
+    String destinationFolderName,
+  ) => confirmAndMoveDroppedItem(
+    context: context,
+    dragged: dragged,
+    destinationFolderId: destinationFolderId,
+    destinationFolderName: destinationFolderName,
+    isSharedDestination: isSharedTree,
+    fileSystemRepository: _repo,
+  );
 
-  /// Drops used to swallow their result: a `move` that 404'd or a `reorder`
-  /// the backend doesn't implement just made the icon snap back with no
-  /// explanation. Say so instead.
+  /// A reorder used to swallow its result: one the backend doesn't
+  /// implement just made the icon snap back with no explanation. Say so
+  /// instead. (Moves report their own failures.)
   void _reportFailure(BuildContext context, Either<Failure, Unit> result) {
     result.match((failure) {
       final messenger = ScaffoldMessenger.maybeOf(context);
@@ -134,7 +137,7 @@ class DesktopIconGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DragTarget<FileItem>(
+    return DragTarget<DraggedFileItem>(
       onAcceptWithDetails: (details) =>
           _dropBefore(context, details.data, null),
       builder: (context, candidateData, rejectedData) {
@@ -146,6 +149,7 @@ class DesktopIconGrid extends StatelessWidget {
               _GridSlot(
                 key: ValueKey('slot-${item.id}'),
                 item: item,
+                containerFolderName: containerFolderName,
                 isSelected: selectedItemIds.contains(item.id),
                 iconColor: iconColor,
                 onFolderDoubleTap: item.isFolder && onFolderDoubleTap != null
@@ -167,6 +171,7 @@ class _GridSlot extends StatelessWidget {
   const _GridSlot({
     super.key,
     required this.item,
+    required this.containerFolderName,
     required this.isSelected,
     required this.iconColor,
     required this.onFolderDoubleTap,
@@ -175,25 +180,35 @@ class _GridSlot extends StatelessWidget {
   });
 
   final FileItem item;
+  final String containerFolderName;
   final bool isSelected;
   final Color iconColor;
   final VoidCallback? onFolderDoubleTap;
-  final void Function(FileItem dragged) onDropBefore;
-  final void Function(FileItem dragged)? onDropInto;
+  final void Function(DraggedFileItem dragged) onDropBefore;
+  final void Function(DraggedFileItem dragged)? onDropInto;
+
+  bool _isSelf(DraggedFileItem dragged) => dragged.item.id == item.id;
 
   @override
   Widget build(BuildContext context) {
-    return DragTarget<FileItem>(
-      onWillAcceptWithDetails: (details) => details.data.id != item.id,
+    return DragTarget<DraggedFileItem>(
+      // An icon let go over its own slot is accepted here and ignored, not
+      // refused. Refused, it fell through to the grid's own target, which
+      // took it for a drop past the last icon and quietly moved the item to
+      // the end of the folder — for what was really a drag called off.
       onAcceptWithDetails: (details) {
+        final dragged = details.data;
+        if (_isSelf(dragged)) return;
         if (onDropInto != null) {
-          onDropInto!(details.data);
+          onDropInto!(dragged);
         } else {
-          onDropBefore(details.data);
+          onDropBefore(dragged);
         }
       },
       builder: (context, candidateData, rejectedData) {
-        final isHovering = candidateData.isNotEmpty;
+        final isHovering = candidateData.any(
+          (dragged) => dragged != null && !_isSelf(dragged),
+        );
         return Container(
           decoration: !isHovering
               ? null
@@ -212,6 +227,7 @@ class _GridSlot extends StatelessWidget {
             isSelected: isSelected,
             iconColor: iconColor,
             onFolderDoubleTap: onFolderDoubleTap,
+            sourceFolderName: containerFolderName,
           ),
         );
       },

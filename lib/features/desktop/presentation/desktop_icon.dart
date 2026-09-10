@@ -5,6 +5,7 @@ import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/features/windows/presentation/folder_window_content.dart';
 import 'package:virtual_desktop/shared/widgets/file_item_actions.dart';
+import 'package:virtual_desktop/shared/widgets/file_item_drop.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
 import '../../../core/services/storage_service.dart';
@@ -20,6 +21,7 @@ class DesktopIcon extends StatelessWidget {
     this.iconColor = Colors.white,
     this.fileSystemRepository,
     this.storageService,
+    this.sourceFolderName,
   });
 
   /// When non-null, double-tapping a folder calls this instead of opening
@@ -36,6 +38,11 @@ class DesktopIcon extends StatelessWidget {
   /// callers rendering items from another tree, e.g. the Shared window.
   final FileSystemRepository? fileSystemRepository;
   final StorageService? storageService;
+
+  /// Name of the folder this icon is shown in, carried by a drag so the
+  /// drop's confirmation can say where the item is moving from. See
+  /// [DraggedFileItem.sourceFolderName].
+  final String? sourceFolderName;
 
   IconData get _iconData {
     switch (item.type) {
@@ -166,8 +173,8 @@ class DesktopIcon extends StatelessWidget {
       },
       child: _visual(context, selected: isSelected),
     );
-    return Draggable<FileItem>(
-      data: item,
+    return Draggable<DraggedFileItem>(
+      data: DraggedFileItem(item: item, sourceFolderName: sourceFolderName),
       feedback: Material(
         color: Colors.transparent,
         child: Opacity(opacity: 0.85, child: _visual(context, selected: false)),

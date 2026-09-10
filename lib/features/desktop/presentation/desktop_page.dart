@@ -212,13 +212,33 @@ class DesktopPage extends StatelessWidget {
                                 ? const Center(
                                     child: CircularProgressIndicator(),
                                   )
-                                : SingleChildScrollView(
-                                    padding: const EdgeInsets.all(16),
-                                    child: DesktopIconGrid(
-                                      items: state.items,
-                                      containerFolderId: null,
-                                      selectedItemIds: state.selectedItemIds,
-                                    ),
+                                : LayoutBuilder(
+                                    builder: (context, constraints) =>
+                                        SingleChildScrollView(
+                                          padding: const EdgeInsets.all(16),
+                                          // The grid is the desktop's drop
+                                          // target, and a Wrap is only as
+                                          // tall as its rows of icons. Held
+                                          // to the viewport (less the 16px
+                                          // padding either side), so a drop
+                                          // below the last row still lands.
+                                          child: ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                              minHeight:
+                                                  (constraints.maxHeight - 32)
+                                                      .clamp(
+                                                        0.0,
+                                                        double.infinity,
+                                                      ),
+                                            ),
+                                            child: DesktopIconGrid(
+                                              items: state.items,
+                                              containerFolderId: null,
+                                              selectedItemIds:
+                                                  state.selectedItemIds,
+                                            ),
+                                          ),
+                                        ),
                                   ),
                           ),
 

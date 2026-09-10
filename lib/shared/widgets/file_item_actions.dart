@@ -13,25 +13,13 @@ import '../../core/repositories/file_system_repository.dart';
 import '../../core/repositories/file_transfer_repository.dart';
 import '../../core/services/storage_service.dart';
 
-/// Message shown when an item is *dragged* across the boundary between
-/// the personal and shared trees.
-///
-/// Paste is no longer refused — it goes through
-/// [FileTransferRepository] — but drag-and-drop still is: a drop onto
-/// another tree's window would have to decide copy-or-move with no way
-/// for the user to say which, where cut/copy has already answered that.
-const crossTreeTransferMessage =
-    "Dragging between personal and shared folders isn't supported — use "
-    'Copy or Cut, then Paste.';
-
 /// Whether moving [item] into a view whose shared-ness is
 /// [isSharedDestination] would cross between the two trees.
 ///
-/// The backend has no cross-tree move or copy — they are different
-/// owner_id scopes, so `move()` on the destination view's repository
-/// 404s. Every drop target checks this up front and says so, rather than
-/// issuing a request it knows will fail and letting the icon snap back
-/// with no explanation.
+/// The trees are different owner_id scopes, so `move()` on the
+/// destination view's repository 404s for an item from the other one.
+/// Paste and drop (confirmAndMoveDroppedItem) both check this up front
+/// and route a crossing through [FileTransferRepository] instead.
 bool isCrossTreeTransfer({
   required FileItem item,
   required bool isSharedDestination,

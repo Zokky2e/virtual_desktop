@@ -247,6 +247,17 @@ more):
   fallback order is `media_kit` (libmpv) first, then `fvp` (libmdk backend
   for the *official* `video_player` API — smallest diff). Don't silently
   swap the video backend without checking this tradeoff first.
+- **Moving/copying between the personal and shared trees goes through
+  `FileTransferRepository`**, not `FileSystemRepository`. Every method on the
+  latter is scoped to the one tree its registration serves; a transfer is the
+  single operation that spans both, so it has its own interface and one
+  unnamed registration. It is backed by `POST /desktop/transfer` and the work
+  happens server-side — bytes never travel through the client, which matters
+  because storage keys are owner-prefixed (so a move relocates them) and
+  because these are the same multi-GB videos the streaming endpoints exist
+  for.
+  Cut/copy + Paste crosses trees; **drag-and-drop still doesn't** — a drop has
+  no way to say copy-or-move, which cut/copy has already answered.
 - Recursive folder copy is intentionally unsupported (`pasteClipboardItem`) —
   this is a deliberate scope cut, not a bug.
 

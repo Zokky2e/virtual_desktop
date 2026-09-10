@@ -10,13 +10,19 @@ import '../../core/constants.dart';
 import '../../core/di/injector.dart';
 import '../../core/models/file_item.dart';
 import '../../core/repositories/file_system_repository.dart';
+import '../../core/repositories/file_transfer_repository.dart';
 import '../../core/services/storage_service.dart';
 
-/// Message shown when an item is dragged or pasted across the boundary
-/// between the personal and shared trees.
+/// Message shown when an item is *dragged* across the boundary between
+/// the personal and shared trees.
+///
+/// Paste is no longer refused — it goes through
+/// [FileTransferRepository] — but drag-and-drop still is: a drop onto
+/// another tree's window would have to decide copy-or-move with no way
+/// for the user to say which, where cut/copy has already answered that.
 const crossTreeTransferMessage =
-    "Moving or copying between personal and shared folders isn't "
-    'supported yet.';
+    "Dragging between personal and shared folders isn't supported — use "
+    'Copy or Cut, then Paste.';
 
 /// Whether moving [item] into a view whose shared-ness is
 /// [isSharedDestination] would cross between the two trees.
@@ -203,6 +209,65 @@ Future<String> _resolveCopyName({
   }
 }
 
+/// Paste that lands in the other tree.
+///
+/// Runs server-side via POST /desktop/transfer rather than
+/// download-then-upload through the client: these are the same
+/// multi-gigabyte videos the Range-streaming endpoints exist for, and on
+/// web a round trip would mean holding one entirely in memory.
+///
+/// A copy resolves its name against the destination folder first, so
+/// pasting twice yields "report (copy).pdf" exactly as a within-tree
+/// paste does. A cut keeps the item's own name; the server 409s on a
+/// clash, and that message is surfaced.
+Future<void> _pasteAcrossTrees({
+  required BuildContext context,
+  required FileClipboardCubit clipboard,
+  required FileItem item,
+  required bool isCut,
+  required String? destinationFolderId,
+  required bool isSharedDestination,
+  required FileSystemRepository destinationRepo,
+  required FileTransferRepository transferRepository,
+}) async {
+  final resolvedName = isCut
+      ? null
+      : await _resolveCopyName(
+          repo: destinationRepo,
+          ownerId: isSharedDestination ? sharedOwnerId : item.ownerId,
+          parentFolderId: destinationFolderId,
+          baseName: item.name,
+        );
+
+  final result = await transferRepository.transfer(
+    itemId: item.id,
+    fromShared: item.ownerId == sharedOwnerId,
+    toShared: isSharedDestination,
+    destinationParentFolderId: destinationFolderId,
+    mode: isCut ? FileTransferMode.move : FileTransferMode.copy,
+    name: resolvedName,
+  );
+
+  result.match(
+    (failure) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${isCut ? 'Move' : 'Copy'} failed: ${failure.message}',
+            ),
+          ),
+        );
+      }
+    },
+    (_) {
+      // Cut is consumed by pasting; copy stays on the clipboard so it can
+      // be pasted again — same as the within-tree behaviour.
+      if (isCut) clipboard.clear();
+    },
+  );
+}
+
 Future<void> pasteClipboardItem({
   required BuildContext context,
   required FileClipboardCubit clipboard,
@@ -213,29 +278,37 @@ Future<void> pasteClipboardItem({
   FileSystemRepository? fileSystemRepository,
   StorageService? storageService,
 
-  /// Whether [destinationFolderId] lives in the shared tree. Used only to
-  /// reject pasting an item across trees — the backend doesn't support
-  /// moving/copying an item between a user's own tree and the shared one
-  /// (they're different owner_id scopes server-side).
+  /// Whether [destinationFolderId] lives in the shared tree. A paste
+  /// that crosses the boundary is routed through [transferRepository]
+  /// instead of the ordinary same-tree move/copy.
   bool isSharedDestination = false,
+
+  /// Handles the cross-tree case. Defaults to the single unnamed
+  /// registration — unlike the repository and service above there is no
+  /// per-tree variant, because a transfer spans both.
+  FileTransferRepository? transferRepository,
 }) async {
   final clipboardState = clipboard.state;
   if (clipboardState.isEmpty) return;
 
   final item = clipboardState.item!;
 
-  if (isCrossTreeTransfer(item: item, isSharedDestination: isSharedDestination)) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(crossTreeTransferMessage)),
-      );
-    }
-    clipboard.clear();
-    return;
-  }
-
   final repo = fileSystemRepository ?? getIt<FileSystemRepository>();
   final storage = storageService ?? getIt<StorageService>();
+
+  if (isCrossTreeTransfer(item: item, isSharedDestination: isSharedDestination)) {
+    await _pasteAcrossTrees(
+      context: context,
+      clipboard: clipboard,
+      item: item,
+      isCut: clipboardState.mode == ClipboardMode.cut,
+      destinationFolderId: destinationFolderId,
+      isSharedDestination: isSharedDestination,
+      destinationRepo: repo,
+      transferRepository: transferRepository ?? getIt<FileTransferRepository>(),
+    );
+    return;
+  }
 
   if (clipboardState.mode == ClipboardMode.cut) {
     // Pasting into the same folder it's already in is a no-op.

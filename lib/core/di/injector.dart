@@ -3,8 +3,10 @@ import 'package:virtual_desktop/core/providers/api/client/api_client.dart';
 import 'package:virtual_desktop/core/providers/api/client/api_websocket_client.dart';
 import 'package:virtual_desktop/core/providers/api/client/files_api.dart';
 import 'package:virtual_desktop/core/providers/api/client/folders_api.dart';
+import 'package:virtual_desktop/core/providers/api/client/transfers_api.dart';
 import 'package:virtual_desktop/core/providers/api/client/wallpapers_api.dart';
 import 'package:virtual_desktop/core/providers/api/repositories/api_file_system_repository.dart';
+import 'package:virtual_desktop/core/providers/api/repositories/api_file_transfer_repository.dart';
 import 'package:virtual_desktop/core/providers/api/repositories/api_wallpaper_repository.dart';
 import 'package:virtual_desktop/core/providers/api/services/api_storage_service.dart';
 import 'package:virtual_desktop/core/providers/api/services/api_wallpaper_storage_service.dart';
@@ -15,6 +17,7 @@ import 'package:virtual_desktop/core/providers/local/shared_prefs_settings_repos
 import 'package:virtual_desktop/core/repositories/settings_repository.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/file_system_repository.dart';
+import '../repositories/file_transfer_repository.dart';
 import '../services/storage_service.dart';
 import '../repositories/wallpaper_repository.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -125,6 +128,12 @@ void setupDependencies() {
       isSharedTree: true,
     ),
     instanceName: sharedInstanceName,
+  );
+
+  // Spans both trees, so it gets one unnamed registration rather than
+  // a personal/shared pair — see FileTransferRepository's docstring.
+  getIt.registerLazySingleton<FileTransferRepository>(
+    () => ApiFileTransferRepository(transfersApi: TransfersApi(apiClient)),
   );
 
   getIt.registerLazySingleton<SettingsRepository>(

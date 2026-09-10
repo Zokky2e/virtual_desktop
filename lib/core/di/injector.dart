@@ -106,10 +106,6 @@ void setupDependencies() {
   final sharedFoldersApi = FoldersApi(apiClient, basePath: '/desktop/shared');
   final sharedFilesApi = FilesApi(apiClient, basePath: '/desktop/shared');
 
-  getIt.registerLazySingleton<FoldersApi>(
-    () => sharedFoldersApi,
-    instanceName: sharedInstanceName,
-  );
   getIt.registerLazySingleton<StorageService>(
     () => ApiStorageService(
       filesApi: sharedFilesApi,

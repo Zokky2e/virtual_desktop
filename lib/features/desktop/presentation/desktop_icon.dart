@@ -161,6 +161,7 @@ class DesktopIcon extends StatelessWidget {
           globalPosition: details.globalPosition,
           item: item,
           fileSystemRepository: fileSystemRepository,
+          storageService: storageService,
         );
       },
       child: _visual(context, selected: isSelected),

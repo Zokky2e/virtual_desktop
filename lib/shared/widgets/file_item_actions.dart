@@ -4,6 +4,7 @@ import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cu
 import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_state.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
+import 'package:virtual_desktop/shared/utils/browser_download.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import '../../core/constants.dart';
 import '../../core/di/injector.dart';
@@ -39,8 +40,12 @@ Future<void> showFileItemContextMenu({
   /// the 'shared'-named instance when this menu is opened on an item
   /// inside the Shared folder window.
   FileSystemRepository? fileSystemRepository,
+
+  /// Same defaulting as [fileSystemRepository]. Used by Download.
+  StorageService? storageService,
 }) async {
   final repo = fileSystemRepository ?? getIt<FileSystemRepository>();
+  final storage = storageService ?? getIt<StorageService>();
   final clipboard = context.read<FileClipboardCubit>();
   final selection = await showMenu<String>(
     context: context,
@@ -53,6 +58,8 @@ Future<void> showFileItemContextMenu({
     items: [
       const PopupMenuItem(value: 'rename', child: Text('Rename')),
       if (!item.isFolder)
+        const PopupMenuItem(value: 'download', child: Text('Download')),
+      if (!item.isFolder)
         const PopupMenuItem(value: 'copy', child: Text('Copy')),
       const PopupMenuItem(value: 'cut', child: Text('Cut')),
       const PopupMenuItem(value: 'delete', child: Text('Delete')),
@@ -63,6 +70,8 @@ Future<void> showFileItemContextMenu({
 
   if (selection == 'rename') {
     await _showRenameDialog(context, item, repo);
+  } else if (selection == 'download') {
+    await _downloadItem(context, item, storage);
   } else if (selection == 'copy') {
     clipboard.copy(item);
   } else if (selection == 'cut') {
@@ -70,6 +79,35 @@ Future<void> showFileItemContextMenu({
   } else if (selection == 'delete') {
     await _confirmAndDelete(context, item, repo);
   }
+}
+
+/// Saves [item] to the user's machine.
+///
+/// This is the only entry point to triggerBrowserDownload — a browser
+/// Blob download on web, a native Save As dialog on Windows. CLAUDE.md
+/// lists downloads as one of the three genuine web/Windows divergences,
+/// but nothing in the UI ever reached it, so the whole
+/// browser_download* trio was describing a feature the user could not
+/// invoke.
+Future<void> _downloadItem(
+  BuildContext context,
+  FileItem item,
+  StorageService storage,
+) async {
+  final storageKey = item.storageKey;
+  if (storageKey == null) return;
+
+  final result = await storage.downloadFile(storageKey);
+  await result.match(
+    (failure) async {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: ${failure.message}')),
+        );
+      }
+    },
+    (bytes) => triggerBrowserDownload(bytes, item.name),
+  );
 }
 
 Future<void> _showRenameDialog(

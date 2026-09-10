@@ -37,7 +37,6 @@ class VideoViewer extends StatefulWidget {
 }
 
 class _VideoViewerState extends State<VideoViewer> {
-  late final VlcPlayerController _controller;
   late final VlcVideoPlaybackController _playback;
 
   final OverlayPortalController _fullscreenOverlayController =
@@ -52,14 +51,14 @@ class _VideoViewerState extends State<VideoViewer> {
   void initState() {
     super.initState();
 
-    _controller = VlcPlayerController(
+    final controller = VlcPlayerController(
       mediaSource: VlcMediaSource(uri: Uri.parse(widget.url)),
       autoPlay: true,
       options: _vlcOptions,
     );
 
     _playback = VlcVideoPlaybackController(
-      controller: _controller,
+      controller: controller,
       subtitleTracks: widget.subtitleTracks,
     );
   }

@@ -182,8 +182,21 @@ more):
   identity API directly instead of the SDK (see `firebase/` provider, which
   stays web-only).
 - `features/preview/presentation/viewers/video_viewer_desktop.dart` — VLC
-  player integration; `vlc_video_playback_controller.dart` wraps it behind
-  the same controller-shaped API the web viewer uses.
+  player integration, wrapped by `vlc_video_playback_controller.dart`.
+  Note that this wrapper is **not** interchangeable with the web
+  `VideoPlaybackController`, despite the parallel naming: its methods
+  return `Future<void>` where the web one returns `void`, and it adds
+  five members the other doesn't have. There is no shared supertype, so
+  `video_viewer_desktop.dart` carries private re-implementations of
+  `VideoPlayerView`, `_SubtitleText`, `_TopBar`, `_BottomBar` and
+  `_SubtitleMenu` rather than reusing `video_player_controls.dart`.
+  Those have already drifted — embedded subtitles exist only on desktop
+  — so **assume any change to playback chrome has to be made twice**,
+  and check the other variant before calling such a change done.
+
+  What *is* genuinely identical is the upstream-facing
+  `VideoViewer(url, fileName, subtitleTracks)` constructor across all
+  three variants, which is what keeps `PreviewBloc` insulated.
 - `features/preview/presentation/viewers/pdf_viewer_desktop.dart` — native
   PDF rendering path distinct from `pdf_viewer_web.dart`.
 - `shared/widgets/adaptive_image_provider_io.dart` — non-web image loading

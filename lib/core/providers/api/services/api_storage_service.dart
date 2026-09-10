@@ -63,14 +63,29 @@ class ApiStorageService implements StorageService {
     }
   }
 
-  /// Embeds the ID token as a query param — Image.network,
-  /// VideoPlayerController, and the PDF iframe can't attach an
-  /// Authorization header, so /desktop/stream/{id} accepts the token
-  /// this way too (same trick your /ws endpoint already uses).
+  /// A token still goes in the query string — Image.network,
+  /// VideoPlayerController and the PDF iframe can't attach an
+  /// Authorization header — but it's an item-scoped stream token minted
+  /// by the server, not the caller's Firebase ID token.
+  ///
+  /// The ID token lasted an hour and was resolved once when the preview
+  /// opened, so a long film's range requests started 401ing partway
+  /// through: silently on web, as a generic decoder error on Windows. It
+  /// was also a credential for the whole API sitting in a URL. A stream
+  /// token outlives a viewing session and, if it leaks, exposes one file.
   @override
   Future<Either<Failure, String>> getDownloadUrl(String path) async {
     try {
-      final token = await _client.currentIdToken;
+      String? token;
+      try {
+        token = await _filesApi.streamToken(path); // path === item id
+      } on DioException catch (e) {
+        // A server that predates the stream-token endpoint 404s here.
+        // Fall back to the old ID-token URL so previews keep working
+        // through a rolling deploy — the endpoints accept both.
+        if (e.response?.statusCode != 404) rethrow;
+        token = await _client.currentIdToken;
+      }
       return Right('${_client.baseUrl}$basePath/stream/$path?token=$token');
     } catch (e) {
       return Left(StorageFailure(_describe(e)));

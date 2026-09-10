@@ -45,6 +45,15 @@ class FilesApi {
     return res.data as Map<String, dynamic>;
   }
 
+  /// Mints an item-scoped token for the streaming endpoint. Replaces
+  /// putting the caller's Firebase ID token in the URL, which expired an
+  /// hour in — mid-film — and put a full-privilege credential somewhere
+  /// it would be logged. See ../virtual-api/app/auth/stream_token.py.
+  Future<String> streamToken(String itemId) async {
+    final res = await _client.dio.get('$basePath/stream-token/$itemId');
+    return (res.data as Map<String, dynamic>)['token'] as String;
+  }
+
   Future<Uint8List> download(String itemId) async {
     final res = await _client.dio.get<List<int>>(
       '$basePath/download/$itemId',

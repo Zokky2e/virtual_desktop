@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:fpdart/fpdart.dart';
+import '../../../constants.dart';
 import '../../../error/failure.dart';
 import '../../../models/file_item.dart';
 import '../../../repositories/file_system_repository.dart';
@@ -14,9 +15,11 @@ class ApiFileSystemRepository implements FileSystemRepository {
     required FoldersApi foldersApi,
     required FilesApi filesApi,
     required ApiWebSocketClient wsClient,
+    bool isSharedTree = false,
   }) : _foldersApi = foldersApi,
        _filesApi = filesApi,
-       _wsClient = wsClient;
+       _wsClient = wsClient,
+       _isSharedTree = isSharedTree;
   // Deliberately does not connect() here. This is a lazy singleton, so the
   // constructor runs once for the life of the process — a socket opened
   // from it is bound to whichever uid was signed in at that moment and can
@@ -27,6 +30,25 @@ class ApiFileSystemRepository implements FileSystemRepository {
   final FoldersApi _foldersApi;
   final FilesApi _filesApi;
   final ApiWebSocketClient _wsClient;
+
+  /// Which tree this instance serves. Only used to filter the shared
+  /// event feed — see [_isForThisTree].
+  final bool _isSharedTree;
+
+  /// Shared-tree mutations are broadcast to every connected client, so
+  /// both registrations see them on the one socket. Without a tree
+  /// marker, a create in the shared root (parent_folder_id null) looked
+  /// exactly like one in the caller's own root, and every personal root
+  /// watcher re-fetched for a change it could not see.
+  ///
+  /// A server that predates the marker omits `owner_id`; then this
+  /// returns true for everything, which is the old behaviour rather than
+  /// a feed that silently goes dead.
+  bool _isForThisTree(Map<String, dynamic> event) {
+    final eventOwner = event['owner_id'] as String?;
+    if (eventOwner == null) return true;
+    return (eventOwner == sharedOwnerId) == _isSharedTree;
+  }
 
   @override
   Future<Either<Failure, List<FileItem>>> getFolder(String? folderId) async {
@@ -54,6 +76,7 @@ class ApiFileSystemRepository implements FileSystemRepository {
       onListen: () {
         refresh();
         sub = _wsClient.events.listen((event) {
+          if (!_isForThisTree(event)) return;
           final eventParent = event['parent_folder_id'] as String?;
           final oldParent = event['old_parent_folder_id'] as String?;
           if (eventParent == folderId || oldParent == folderId) refresh();
@@ -164,6 +187,7 @@ class ApiFileSystemRepository implements FileSystemRepository {
       onListen: () {
         refresh();
         sub = _wsClient.events.listen((event) {
+          if (!_isForThisTree(event)) return;
           final name = event['event'] as String? ?? '';
           if (name.endsWith('_deleted') || name.endsWith('_restored')) {
             refresh();

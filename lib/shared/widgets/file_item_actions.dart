@@ -11,6 +11,25 @@ import '../../core/models/file_item.dart';
 import '../../core/repositories/file_system_repository.dart';
 import '../../core/services/storage_service.dart';
 
+/// Message shown when an item is dragged or pasted across the boundary
+/// between the personal and shared trees.
+const crossTreeTransferMessage =
+    "Moving or copying between personal and shared folders isn't "
+    'supported yet.';
+
+/// Whether moving [item] into a view whose shared-ness is
+/// [isSharedDestination] would cross between the two trees.
+///
+/// The backend has no cross-tree move or copy — they are different
+/// owner_id scopes, so `move()` on the destination view's repository
+/// 404s. Every drop target checks this up front and says so, rather than
+/// issuing a request it knows will fail and letting the icon snap back
+/// with no explanation.
+bool isCrossTreeTransfer({
+  required FileItem item,
+  required bool isSharedDestination,
+}) => (item.ownerId == sharedOwnerId) != isSharedDestination;
+
 Future<void> showFileItemContextMenu({
   required BuildContext context,
   required Offset globalPosition,
@@ -167,16 +186,10 @@ Future<void> pasteClipboardItem({
 
   final item = clipboardState.item!;
 
-  final itemIsShared = item.ownerId == sharedOwnerId;
-  if (itemIsShared != isSharedDestination) {
+  if (isCrossTreeTransfer(item: item, isSharedDestination: isSharedDestination)) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Moving or copying between personal and shared folders isn't "
-            'supported yet.',
-          ),
-        ),
+        const SnackBar(content: Text(crossTreeTransferMessage)),
       );
     }
     clipboard.clear();

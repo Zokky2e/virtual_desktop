@@ -199,6 +199,36 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
     );
   }
 
+  /// Handles a drop into this window's current folder.
+  ///
+  /// The cross-tree check comes first: the backend has no move between
+  /// the personal and shared trees, so this used to fire a request that
+  /// 404'd and then discard the result, which read as the drag silently
+  /// not working. The same is true of an ordinary failure, which was also
+  /// being thrown away.
+  Future<void> _acceptDrop(FileItem dragged) async {
+    if (isCrossTreeTransfer(
+      item: dragged,
+      isSharedDestination: widget.isShared,
+    )) {
+      _showMessage(crossTreeTransferMessage);
+      return;
+    }
+    final result = await _repo.move(dragged.id, _currentFolder.id);
+    result.match((failure) => _showMessage(failure.message), (_) {});
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
+      ),
+    );
+  }
+
   /// Reconciles this tree with files that reached the server out-of-band.
   /// Only offered on the shared tree, where that can actually happen.
   Future<void> _sync() async {
@@ -207,15 +237,10 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
     final result = await _repo.sync();
     if (!mounted) return;
     setState(() => _isSyncing = false);
-    final message = result.match(
-      (failure) => 'Sync failed: ${failure.message}',
-      (_) => 'Synced with server',
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
+    _showMessage(
+      result.match(
+        (failure) => 'Sync failed: ${failure.message}',
+        (_) => 'Synced with server',
       ),
     );
   }
@@ -317,7 +342,7 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                     return DragTarget<FileItem>(
                       // Empty space inside this folder window — drop lands in this folder.
                       onAcceptWithDetails: (details) =>
-                          _repo.move(details.data.id, _currentFolder.id),
+                          _acceptDrop(details.data),
                       builder: (context, candidateData, rejectedData) {
                         return GestureDetector(
                           onSecondaryTapDown: (details) async {

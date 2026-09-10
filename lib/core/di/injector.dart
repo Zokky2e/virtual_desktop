@@ -123,6 +123,10 @@ void setupDependencies() {
       foldersApi: sharedFoldersApi,
       filesApi: sharedFilesApi,
       wsClient: wsClient,
+      // Both registrations share one socket, and shared mutations are
+      // broadcast to everyone — this is how each tells its own events
+      // from the other's.
+      isSharedTree: true,
     ),
     instanceName: sharedInstanceName,
   );

@@ -6,6 +6,7 @@ import '../../../core/error/failure.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/file_system_repository.dart';
 import '../../../shared/utils/sort_index.dart';
+import '../../../shared/widgets/file_item_actions.dart';
 import 'desktop_icon.dart';
 
 /// Renders [items] as a wrap of draggable icons that can be reordered
@@ -31,6 +32,7 @@ class DesktopIconGrid extends StatelessWidget {
     this.onFolderDoubleTap,
     this.iconColor = Colors.white,
     this.fileSystemRepository,
+    this.isSharedTree = false,
   });
 
   final List<FileItem> items;
@@ -43,6 +45,11 @@ class DesktopIconGrid extends StatelessWidget {
   /// registration, so DesktopPage is unaffected.
   final FileSystemRepository? fileSystemRepository;
 
+  /// Whether this grid is showing the shared tree. Only used to reject a
+  /// drop coming from the other tree — [fileSystemRepository] is what
+  /// actually decides which tree an accepted drop acts on.
+  final bool isSharedTree;
+
   FileSystemRepository get _repo =>
       fileSystemRepository ?? getIt<FileSystemRepository>();
 
@@ -52,6 +59,7 @@ class DesktopIconGrid extends StatelessWidget {
     FileItem? before,
   ) async {
     if (dragged.id == before?.id) return;
+    if (_rejectCrossTree(context, dragged)) return;
 
     final repo = _repo;
 
@@ -92,8 +100,26 @@ class DesktopIconGrid extends StatelessWidget {
     FileItem folder,
   ) async {
     if (dragged.id == folder.id) return;
+    if (_rejectCrossTree(context, dragged)) return;
     final result = await _repo.move(dragged.id, folder.id);
     if (context.mounted) _reportFailure(context, result);
+  }
+
+  /// True when the drop was refused. Checked before any request goes out:
+  /// dragging a shared item onto the personal desktop (or the reverse)
+  /// used to issue a move() that 404'd, which read as the drag simply not
+  /// working.
+  bool _rejectCrossTree(BuildContext context, FileItem dragged) {
+    if (!isCrossTreeTransfer(
+      item: dragged,
+      isSharedDestination: isSharedTree,
+    )) {
+      return false;
+    }
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(const SnackBar(content: Text(crossTreeTransferMessage)));
+    return true;
   }
 
   /// Drops used to swallow their result: a `move` that 404'd or a `reorder`

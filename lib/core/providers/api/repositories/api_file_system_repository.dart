@@ -16,9 +16,13 @@ class ApiFileSystemRepository implements FileSystemRepository {
     required ApiWebSocketClient wsClient,
   }) : _foldersApi = foldersApi,
        _filesApi = filesApi,
-       _wsClient = wsClient {
-    _wsClient.connect();
-  }
+       _wsClient = wsClient;
+  // Deliberately does not connect() here. This is a lazy singleton, so the
+  // constructor runs once for the life of the process — a socket opened
+  // from it is bound to whichever uid was signed in at that moment and can
+  // never be reopened for the next one. The composition root owns the
+  // socket's lifecycle against authStateChanges instead; see
+  // core/di/injector.dart.
 
   final FoldersApi _foldersApi;
   final FilesApi _filesApi;

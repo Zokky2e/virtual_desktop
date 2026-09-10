@@ -91,8 +91,8 @@ lib/
       api/                   # REST/WebSocket provider — talks to virtual-api
         client/              # ApiClient, ApiWebSocketClient, FilesApi, FoldersApi
         models/              # response <-> domain mappers
-        repositories/        # ApiFileSystemRepository
-        services/            # ApiStorageService
+        repositories/        # ApiFileSystemRepository, ApiWallpaperRepository
+        services/            # ApiStorageService, ApiWallpaperStorageService
       firebase/              # Firestore/Firebase Storage/Firebase Auth implementations
       local/                 # fakes + local-disk wallpaper storage (non-web)
       rest/                  # RestFirebaseAuthRepository (Firebase auth over REST, no plugin)
@@ -134,9 +134,24 @@ injection (the pattern `FolderWindowContent` uses) rather than reaching into
 design rationale if you need it.
 
 There's a similar `instanceName: wallpaperInstanceName` (`'wallpaper'`) split
-for the wallpaper repository/service (Firestore+API on web, local disk on
-desktop) — kept separate so switching it can never affect the personal file
-tree registrations.
+for the wallpaper repository/service — kept separate so switching it can never
+affect the personal file tree registrations. On web it resolves to
+`ApiWallpaperRepository` / `ApiWallpaperStorageService`, backed by the
+backend's `/desktop/wallpapers` routes; on desktop, to the local-disk pair.
+
+A wallpaper is deliberately **not** a file-tree item. It has its own table
+(`wallpapers`) and its own storage prefix (`wallpapers/{uid}/`, outside the
+`users/` subtree `ReconcileService` scans) on the server, so a wallpaper can
+never appear as a desktop icon or be swept into the tree by a sync. The web
+registration used to be a literal alias — `() => getIt<StorageService>()` —
+which made that separation untrue and dropped a junk `<millis>_photo.png`
+into the root of the user's tree on every wallpaper upload. Don't reintroduce
+an alias here.
+
+`FirestoreWallpaperRepository` is no longer registered anywhere as a result.
+It still compiles but has joined the other unregistered Firebase provider
+implementations; wallpapers saved to Firestore by an older web build are not
+migrated and won't appear in the gallery.
 
 ## Platform-conditional files (web vs. Windows desktop)
 
@@ -191,6 +206,14 @@ more):
   delete, search, recycle bin. WebSocket is `/ws`, outside the REST prefix,
   and pushes live `file_created`/`file_deleted`/`file_renamed`/etc. events so
   the UI never has to poll.
+- `/desktop/wallpapers` is a third prefix, and not a file tree: list, upload,
+  `stream/{id}`, `{id}`, and `PATCH {id}/active`. It has its own table and
+  storage prefix, and deliberately emits **no** WebSocket events — the client
+  refetches after its own mutations instead (`ApiWallpaperRepository`).
+- The `/ws` socket is bound server-side to the uid in its handshake token, so
+  it can't outlive a sign-in. `injector.dart` owns that lifecycle against
+  `authStateChanges` — never call `connect()` from a repository constructor,
+  which is what previously broke live updates after a sign-out/sign-in.
 - Full endpoint list and request/response shapes: see `../virtual-api`'s
   `app/api/*.py` routers directly, or this project's
   `Virtual_Desktop_Server_Architecture.md` / `API_Provider_Architecture.md`
@@ -203,7 +226,8 @@ more):
   so `FirebaseAuthRepository` / `FirestoreWallpaperRepository` don't work
   there as-is — this is why `RestFirebaseAuthRepository` exists. Any
   Windows-targeted change touching auth or wallpaper needs to go through the
-  REST/local providers, not the Firebase ones.
+  REST/local providers, not the Firebase ones. (Wallpapers no longer use
+  Firebase on either target — see the `wallpaperInstanceName` note above.)
 - **VLC (Windows video playback) CPU usage is an open risk**, not yet
   confirmed problematic. If profiling shows a core pinned near 100% during
   normal 1080p playback, or high CPU while paused/idle, the documented

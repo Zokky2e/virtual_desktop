@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -15,19 +17,41 @@ class _AudioViewerState extends State<AudioViewer> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
+  /// Held so they can be cancelled. Previously these three were fire-and-
+  /// forget: closing the preview window disposed the State but left the
+  /// listeners attached, so the next position tick called setState on a
+  /// defunct element.
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+
   @override
   void initState() {
     super.initState();
-    _player.onDurationChanged.listen((d) => setState(() => _duration = d));
-    _player.onPositionChanged.listen((p) => setState(() => _position = p));
-    _player.onPlayerStateChanged.listen(
-      (state) => setState(() => _isPlaying = state == PlayerState.playing),
-    );
+    _subscriptions.addAll([
+      _player.onDurationChanged.listen(
+        (d) => _apply(() => _duration = d),
+      ),
+      _player.onPositionChanged.listen(
+        (p) => _apply(() => _position = p),
+      ),
+      _player.onPlayerStateChanged.listen(
+        (state) => _apply(() => _isPlaying = state == PlayerState.playing),
+      ),
+    ]);
     _player.setSourceUrl(widget.url);
+  }
+
+  /// A tick can still be in flight between cancel() and disposal, so the
+  /// mounted check stays even with the subscriptions owned.
+  void _apply(VoidCallback update) {
+    if (!mounted) return;
+    setState(update);
   }
 
   @override
   void dispose() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
     _player.dispose();
     super.dispose();
   }

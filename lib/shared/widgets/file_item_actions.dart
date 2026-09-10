@@ -5,17 +5,11 @@ import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_st
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_event.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
+import '../../core/constants.dart';
 import '../../core/di/injector.dart';
 import '../../core/models/file_item.dart';
 import '../../core/repositories/file_system_repository.dart';
 import '../../core/services/storage_service.dart';
-
-/// Sentinel owner_id the server uses for the shared tree — mirrors
-/// app/constants.py's SHARED_OWNER_ID. Used only to guard against
-/// pasting an item into a tree it doesn't belong to (see
-/// pasteClipboardItem below); the two trees don't support cross-tree
-/// move/copy.
-const _sharedOwnerId = 'shared';
 
 Future<void> showFileItemContextMenu({
   required BuildContext context,
@@ -142,9 +136,13 @@ Future<String> _resolveCopyName({
     final exists = existsResult.getOrElse((_) => false);
     if (!exists) return candidate;
     suffix++;
+    // suffix counts attempts, so the printed number is suffix - 1: the
+    // sequence is name, name (copy), name (copy 2), name (copy 3). It
+    // used to print `suffix` directly and jump straight from "(copy)" to
+    // "(copy 3)".
     candidate = suffix == 2
         ? '$stem (copy)$extension'
-        : '$stem (copy $suffix)$extension';
+        : '$stem (copy ${suffix - 1})$extension';
   }
 }
 
@@ -169,7 +167,7 @@ Future<void> pasteClipboardItem({
 
   final item = clipboardState.item!;
 
-  final itemIsShared = item.ownerId == _sharedOwnerId;
+  final itemIsShared = item.ownerId == sharedOwnerId;
   if (itemIsShared != isSharedDestination) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -232,10 +230,19 @@ Future<void> pasteClipboardItem({
     (bytes) async {
       final newStorageKey =
           'users/${item.ownerId}/${DateTime.now().millisecondsSinceEpoch}_$resolvedName';
+      // parentFolderId and fileName are what the API provider's upload
+      // endpoint actually reads — it creates the tree record together with
+      // the bytes. Omitting them sent a null parent and let the service
+      // fall back to `path.split('/').last`, so the copy landed at the root
+      // of the tree named `1712345678901_report.pdf` and the resolvedName
+      // de-duplication above was computed and then thrown away.
       final uploadResult = await storage.uploadFile(
         bytes: bytes,
         path: newStorageKey,
         mimeType: mimeTypeForFileName(resolvedName),
+        parentFolderId: destinationFolderId,
+        fileName: resolvedName,
+        isShared: isSharedDestination,
       );
       await uploadResult.match(
         (failure) async {

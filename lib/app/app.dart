@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:virtual_desktop/core/repositories/settings_repository.dart';
+import 'package:virtual_desktop/core/repositories/wallpaper_repository.dart';
+import 'package:virtual_desktop/core/services/storage_service.dart';
 import 'package:virtual_desktop/features/authentication/bloc/auth_state.dart';
 import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cubit.dart';
 import 'package:virtual_desktop/features/settings/bloc/settings_bloc.dart';
@@ -39,7 +41,20 @@ class _AppState extends State<App> {
     // still null on both platforms. The Authenticated transition below is
     // the only point where a load can succeed. Until then the BlocBuilder
     // falls back to ThemeMode.dark, which is the stored default anyway.
-    _settingsBloc = SettingsBloc(settingsRepository: getIt<SettingsRepository>());
+    // Resolved here, not inside the bloc: picking which wallpaper backend
+    // is active (Firestore+API on web, local disk on desktop) belongs to
+    // the composition root, and keeps SettingsBloc constructible in a test
+    // without a populated container.
+    _settingsBloc = SettingsBloc(
+      settingsRepository: getIt<SettingsRepository>(),
+      wallpaperRepository: getIt<WallpaperRepository>(
+        instanceName: wallpaperInstanceName,
+      ),
+      wallpaperStorageService: getIt<StorageService>(
+        instanceName: wallpaperInstanceName,
+      ),
+      authRepository: getIt<AuthRepository>(),
+    );
 
     _clipboardCubit = FileClipboardCubit();
 

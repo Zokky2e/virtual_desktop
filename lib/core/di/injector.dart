@@ -3,10 +3,12 @@ import 'package:virtual_desktop/core/providers/api/client/api_client.dart';
 import 'package:virtual_desktop/core/providers/api/client/api_websocket_client.dart';
 import 'package:virtual_desktop/core/providers/api/client/files_api.dart';
 import 'package:virtual_desktop/core/providers/api/client/folders_api.dart';
+import 'package:virtual_desktop/core/providers/api/client/wallpapers_api.dart';
 import 'package:virtual_desktop/core/providers/api/repositories/api_file_system_repository.dart';
+import 'package:virtual_desktop/core/providers/api/repositories/api_wallpaper_repository.dart';
 import 'package:virtual_desktop/core/providers/api/services/api_storage_service.dart';
+import 'package:virtual_desktop/core/providers/api/services/api_wallpaper_storage_service.dart';
 import 'package:virtual_desktop/core/providers/firebase/firebase_auth_repository.dart';
-import 'package:virtual_desktop/core/providers/firebase/firestore_wallpaper_repository.dart';
 import 'package:virtual_desktop/core/providers/local/local_wallpaper_repository.dart';
 import 'package:virtual_desktop/core/providers/local/local_wallpaper_storage_service.dart';
 import 'package:virtual_desktop/core/providers/local/shared_prefs_settings_repository.dart';
@@ -71,6 +73,17 @@ void setupDependencies() {
     getIdToken: _currentIdToken,
   );
 
+  // The backend binds each /ws connection to the uid in its handshake
+  // token, so the socket's lifetime is a sign-in's lifetime — not the
+  // process's. Driving it from here (the composition root) rather than
+  // from ApiFileSystemRepository's constructor is what makes a second
+  // sign-in work: signing out and back in as another user used to leave
+  // the first user's socket in place, so nothing live-updated until a
+  // restart. Both tree registrations share this one client.
+  getIt<AuthRepository>().authStateChanges.listen(
+    (user) => wsClient.setOwner(user?.uid),
+  );
+
   // --- Personal tree (basePath '/desktop') — the default, unnamed
   // registrations every existing call site already resolves.
   final foldersApi = FoldersApi(apiClient);
@@ -120,12 +133,27 @@ void setupDependencies() {
     ),
   );
   if (kIsWeb) {
+    // Backed by /desktop/wallpapers — its own table and its own storage
+    // prefix server-side, so a wallpaper is never a file-tree item.
+    //
+    // This replaces two things. FirestoreWallpaperRepository, which only
+    // ever worked on web and is now unregistered; and, more importantly,
+    // a `() => getIt<StorageService>()` alias that made the wallpaper
+    // StorageService *literally the personal-tree one*. That alias is why
+    // every web wallpaper upload left a junk `<millis>_photo.png` file at
+    // the root of the user's desktop, and it contradicted the "kept
+    // separate so this swap can't affect the personal file tree
+    // registrations" guarantee in CLAUDE.md.
+    final wallpapersApi = WallpapersApi(apiClient);
     getIt.registerLazySingleton<WallpaperRepository>(
-      () => FirestoreWallpaperRepository(),
+      () => ApiWallpaperRepository(wallpapersApi: wallpapersApi),
       instanceName: wallpaperInstanceName,
     );
     getIt.registerLazySingleton<StorageService>(
-      () => getIt<StorageService>(),
+      () => ApiWallpaperStorageService(
+        wallpapersApi: wallpapersApi,
+        client: apiClient,
+      ),
       instanceName: wallpaperInstanceName,
     );
   } else {

@@ -22,7 +22,15 @@ class DesktopBloc extends Bloc<DesktopEvent, DesktopState> {
     DesktopFolderWatchRequested event,
     Emitter<DesktopState> emit,
   ) async {
-    emit(state.copyWith(currentFolderId: event.folderId, isLoading: true));
+    // folderId == null means the tree root, which copyWith can only be
+    // told via the explicit clear flag.
+    emit(
+      state.copyWith(
+        currentFolderId: event.folderId,
+        clearCurrentFolderId: event.folderId == null,
+        isLoading: true,
+      ),
+    );
     await _folderSubscription?.cancel();
     _folderSubscription = _fileSystemRepository
         .watchFolder(event.folderId)

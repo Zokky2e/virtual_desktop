@@ -1,5 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:virtual_desktop/core/di/injector.dart';
+import '../../../core/constants.dart';
 import '../../../core/models/file_item.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/repositories/file_system_repository.dart';
@@ -27,8 +27,11 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
     UploadFileRequested event,
     Emitter<UploadState> emit,
   ) async {
+    // sharedOwnerId, not the 'shared' get_it instance name this used to
+    // read: the two spell the same string today, but only one of them is
+    // a value the server persists in owner_id.
     final uid = event.isShared
-        ? sharedInstanceName
+        ? sharedOwnerId
         : _authRepository.currentUser?.uid;
     if (uid == null) {
       emit(const UploadFailure('Not signed in.'));

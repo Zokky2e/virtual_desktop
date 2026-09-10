@@ -81,6 +81,23 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
   late final List<_FolderStackEntry> _folderStack;
   bool _isSyncing = false;
 
+  /// Owned here rather than created inside build(): the actions in the
+  /// toolbar and context menu need to reach this exact bloc, and
+  /// context.read only walks *ancestors* — from State.context, a provider
+  /// created in this build() is a descendant, so the lookup used to sail
+  /// past it and find DesktopPage's bloc instead. That one is wired to the
+  /// unnamed personal registrations, so uploading from the Shared window
+  /// hit /desktop/upload?isShared=true rather than /desktop/shared/upload.
+  late final UploadBloc _uploadBloc;
+
+  /// watchFolder() builds a fresh StreamController per call, so calling it
+  /// from build() handed StreamBuilder a different stream on every frame:
+  /// it resubscribed each time and onListen re-issued GET /desktop/folder/
+  /// {id}. WindowInstance.props includes position and size, so dragging any
+  /// window rebuilds every DraggableWindow — roughly 60 folder listings a
+  /// second, per open folder window. Built once per folder instead.
+  late Stream<List<FileItem>> _folderStream;
+
   FileSystemRepository get _repo =>
       widget.fileSystemRepository ?? getIt<FileSystemRepository>();
   StorageService get _storage =>
@@ -95,21 +112,42 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
         name: widget.rootFolder?.name ?? widget.rootTitle!,
       ),
     ];
+    _uploadBloc = UploadBloc(
+      storageService: _storage,
+      fileSystemRepository: _repo,
+      authRepository: getIt<AuthRepository>(),
+    );
+    _folderStream = _repo.watchFolder(_currentFolder.id);
+  }
+
+  @override
+  void dispose() {
+    _uploadBloc.close();
+    super.dispose();
   }
 
   _FolderStackEntry get _currentFolder => _folderStack.last;
 
+  /// Only ever called when the folder actually changed — a rebuild alone
+  /// must not resubscribe.
+  void _watchCurrentFolder() {
+    _folderStream = _repo.watchFolder(_currentFolder.id);
+  }
+
   void _openSubfolder(FileItem folder) {
-    setState(
-      () =>
-          _folderStack.add(_FolderStackEntry(id: folder.id, name: folder.name)),
-    );
+    setState(() {
+      _folderStack.add(_FolderStackEntry(id: folder.id, name: folder.name));
+      _watchCurrentFolder();
+    });
     _syncWindowChrome();
   }
 
   void _goBack() {
     if (_folderStack.length <= 1) return;
-    setState(() => _folderStack.removeLast());
+    setState(() {
+      _folderStack.removeLast();
+      _watchCurrentFolder();
+    });
     _syncWindowChrome();
   }
 
@@ -150,7 +188,7 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
     final result = await FilePicker.platform.pickFiles(withData: true);
     final file = result?.files.single;
     if (file?.bytes == null || !mounted) return;
-    context.read<UploadBloc>().add(
+    _uploadBloc.add(
       UploadFileRequested(
         bytes: file!.bytes!,
         fileName: file.name,
@@ -184,12 +222,8 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => UploadBloc(
-        storageService: _storage,
-        fileSystemRepository: _repo,
-        authRepository: getIt<AuthRepository>(),
-      ),
+    return BlocProvider.value(
+      value: _uploadBloc,
       child: BlocListener<UploadBloc, UploadState>(
         listener: (context, state) {
           if (state is UploadFailure) {
@@ -262,7 +296,7 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
               ),
               Expanded(
                 child: StreamBuilder<List<FileItem>>(
-                  stream: _repo.watchFolder(_currentFolder.id),
+                  stream: _folderStream,
                   builder: (context, snapshot) {
                     final items = snapshot.data ?? const [];
                     if (!snapshot.hasData) {

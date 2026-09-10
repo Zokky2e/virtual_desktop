@@ -45,14 +45,26 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
   void initState() {
     super.initState();
     _controller.addListener(_onControllerChanged);
+    // Subtitle selection lives on the playback controller, not the
+    // VideoPlayerController — setSubtitleTrack calls notifyListeners()
+    // there. Without this listener, picking a track while paused changed
+    // the state but nothing repainted, so no subtitle appeared until
+    // playback resumed and a position tick happened to rebuild. The
+    // desktop viewer already subscribes to both; this variant didn't.
+    widget.playback.addListener(_onPlaybackChanged);
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
     _controller.removeListener(_onControllerChanged);
+    widget.playback.removeListener(_onPlaybackChanged);
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onPlaybackChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onControllerChanged() {

@@ -32,22 +32,48 @@ class _VideoViewerState extends State<VideoViewer> {
   late final VideoPlaybackController _playback;
   bool _isInitialized = false;
 
+  /// Non-null once the video is known to be unplayable. Without this the
+  /// viewer sat on its spinner forever: a 404, an expired stream token or
+  /// a codec the browser can't decode never sets [_isInitialized], and
+  /// nothing else was watching for the failure. The desktop viewer has
+  /// always rendered `value.errorDescription`; this is the same behaviour
+  /// on the web variant.
+  String? _error;
+
   @override
   void initState() {
     super.initState();
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
-      ..setLooping(false)
-      ..initialize().then((_) {
-        if (mounted) setState(() => _isInitialized = true);
-      });
+      ..setLooping(false);
+    // Two different failure shapes: a rejected initialize() future (bad
+    // URL, network error) and a later value.hasError (browser refuses the
+    // codec, stream dies mid-load). Both have to be caught.
+    _controller
+        .initialize()
+        .then((_) {
+          if (mounted) setState(() => _isInitialized = true);
+        })
+        .catchError((Object e) {
+          if (mounted) setState(() => _error = e.toString());
+        });
+    _controller.addListener(_onControllerChanged);
     _playback = VideoPlaybackController(
       controller: _controller,
       subtitleTracks: widget.subtitleTracks,
     );
   }
 
+  void _onControllerChanged() {
+    if (!mounted || _error != null) return;
+    final value = _controller.value;
+    if (value.hasError) {
+      setState(() => _error = value.errorDescription ?? 'Unable to play video');
+    }
+  }
+
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _playback.dispose(); // also disposes _controller
     super.dispose();
   }
@@ -64,6 +90,11 @@ class _VideoViewerState extends State<VideoViewer> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.white)),
+      );
+    }
     if (!_isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }

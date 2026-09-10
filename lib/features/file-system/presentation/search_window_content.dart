@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../core/di/injector.dart';
 import '../../../core/models/file_item.dart';
@@ -13,13 +15,36 @@ class SearchWindowContent extends StatefulWidget {
 }
 
 class _SearchWindowContentState extends State<SearchWindowContent> {
+  /// How long typing has to pause before a request goes out. onChanged
+  /// fires per keystroke, so without this "report" issued six searches.
+  static const _debounce = Duration(milliseconds: 250);
+
   final _controller = TextEditingController();
   List<FileItem> _results = [];
   bool _isSearching = false;
 
+  Timer? _debounceTimer;
+
+  /// Incremented for every search started. A response whose id no longer
+  /// matches is stale and gets dropped: requests can finish out of order,
+  /// so without this, typing "report" could settle on the results for
+  /// "rep" if the shorter query's response came back last.
+  int _searchId = 0;
+
+  void _onQueryChanged(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(_debounce, () => _runSearch(query));
+  }
+
   Future<void> _runSearch(String query) async {
+    _debounceTimer?.cancel();
+    final requestId = ++_searchId;
+
     if (query.trim().isEmpty) {
-      setState(() => _results = []);
+      setState(() {
+        _isSearching = false;
+        _results = [];
+      });
       return;
     }
     final user = getIt<AuthRepository>().currentUser;
@@ -36,7 +61,7 @@ class _SearchWindowContentState extends State<SearchWindowContent> {
       user.uid,
       query.trim(),
     );
-    if (!mounted) return;
+    if (!mounted || requestId != _searchId) return;
     setState(() {
       _isSearching = false;
       _results = result.getOrElse((_) => []);
@@ -45,6 +70,7 @@ class _SearchWindowContentState extends State<SearchWindowContent> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -72,8 +98,9 @@ class _SearchWindowContentState extends State<SearchWindowContent> {
                   color: colorScheme.onPrimary.withValues(alpha: 0.4),
                 ),
               ),
+              // Enter searches immediately; typing waits for the pause.
               onSubmitted: _runSearch,
-              onChanged: _runSearch,
+              onChanged: _onQueryChanged,
             ),
           ),
           if (_isSearching) const LinearProgressIndicator(),

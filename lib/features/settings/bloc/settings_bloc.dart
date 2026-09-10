@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:virtual_desktop/core/di/injector.dart';
 import 'package:virtual_desktop/core/repositories/auth_repository.dart';
 import 'package:virtual_desktop/core/repositories/wallpaper_repository.dart';
 import 'package:virtual_desktop/core/services/storage_service.dart';
@@ -9,9 +8,24 @@ import 'settings_event.dart';
 import 'settings_state.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
-  SettingsBloc({required SettingsRepository settingsRepository})
-    : _settingsRepository = settingsRepository,
-      super(const SettingsLoading()) {
+  /// Every collaborator arrives through the constructor — including the
+  /// wallpaper-scoped [WallpaperRepository]/[StorageService], which this
+  /// bloc used to resolve from `get_it` itself with a hardcoded
+  /// `wallpaperInstanceName`. Choosing an implementation is the
+  /// composition root's job (convention #3): reaching into the container
+  /// from an event handler meant a third wallpaper backend could no
+  /// longer be swapped by re-registering, and made this the one bloc no
+  /// test could construct without a fully populated global container.
+  SettingsBloc({
+    required SettingsRepository settingsRepository,
+    required WallpaperRepository wallpaperRepository,
+    required StorageService wallpaperStorageService,
+    required AuthRepository authRepository,
+  }) : _settingsRepository = settingsRepository,
+       _wallpaperRepository = wallpaperRepository,
+       _wallpaperStorageService = wallpaperStorageService,
+       _authRepository = authRepository,
+       super(const SettingsLoading()) {
     on<SettingsLoadRequested>(_onLoadRequested);
     on<SettingsThemeModeChanged>(_onThemeModeChanged);
     on<SettingsWallpaperColorChanged>(_onWallpaperColorChanged);
@@ -20,6 +34,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   final SettingsRepository _settingsRepository;
+  final WallpaperRepository _wallpaperRepository;
+  final StorageService _wallpaperStorageService;
+  final AuthRepository _authRepository;
 
   Future<void> _onLoadRequested(
     SettingsLoadRequested event,
@@ -27,7 +44,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   ) async {
     // Checked before load(): settings keys are scoped per user, so
     // SettingsRepository itself can't answer with no signed-in user.
-    final user = getIt<AuthRepository>().currentUser;
+    final user = _authRepository.currentUser;
     if (user == null) {
       // Signed out mid-load — emit defaults rather than throwing out of the
       // event handler, which would leave Settings stuck on its spinner.
@@ -35,20 +52,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       return;
     }
     var settings = await _settingsRepository.load();
-    final wallpaperRepository = getIt<WallpaperRepository>(
-      instanceName: wallpaperInstanceName,
-    );
-    final storageService = getIt<StorageService>(
-      instanceName: wallpaperInstanceName,
-    );
-    final wallpapers = await wallpaperRepository
+    final wallpapers = await _wallpaperRepository
         .watchWallpapers(user.uid)
         .first;
     final matching = wallpapers.where((w) => w.isSet);
 
     if (matching.isNotEmpty) {
       final storageKey = matching.first.storageKey!;
-      final urlResult = await storageService.getDownloadUrl(storageKey);
+      final urlResult = await _wallpaperStorageService.getDownloadUrl(
+        storageKey,
+      );
 
       urlResult.match(
         (_) {},

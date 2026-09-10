@@ -435,22 +435,45 @@ class _WallpaperSwatch extends StatelessWidget {
   }
 }
 
-class _WallpaperGallery extends StatelessWidget {
+class _WallpaperGallery extends StatefulWidget {
   const _WallpaperGallery({required this.currentImageUrl});
 
   final String? currentImageUrl;
 
   @override
+  State<_WallpaperGallery> createState() => _WallpaperGalleryState();
+}
+
+class _WallpaperGalleryState extends State<_WallpaperGallery> {
+  /// watchWallpapers() builds a fresh StreamController per call, so
+  /// calling it from build() handed StreamBuilder a new stream on every
+  /// rebuild — it resubscribed each time and refetched the gallery. Same
+  /// shape as the folder window's watchFolder() problem, just cheaper.
+  /// Built once here instead.
+  late final String? _uid;
+  Stream<List<WallpaperItem>>? _wallpapers;
+
+  @override
+  void initState() {
+    super.initState();
+    _uid = getIt<AuthRepository>().currentUser?.uid;
+    final uid = _uid;
+    if (uid != null) {
+      _wallpapers = getIt<WallpaperRepository>(
+        instanceName: wallpaperInstanceName,
+      ).watchWallpapers(uid);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final uid = getIt<AuthRepository>().currentUser?.uid;
-    if (uid == null) return const SizedBox.shrink();
+    final wallpapers = _wallpapers;
+    if (wallpapers == null) return const SizedBox.shrink();
 
     return SizedBox(
       height: 72,
       child: StreamBuilder<List<WallpaperItem>>(
-        stream: getIt<WallpaperRepository>(
-          instanceName: wallpaperInstanceName,
-        ).watchWallpapers(uid),
+        stream: wallpapers,
         builder: (context, snapshot) {
           final wallpapers = snapshot.data ?? const [];
           if (!snapshot.hasData) {

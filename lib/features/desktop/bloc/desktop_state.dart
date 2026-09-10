@@ -18,13 +18,23 @@ class DesktopState extends Equatable {
 
   DesktopState copyWith({
     String? currentFolderId,
+
+    /// null is a meaningful value for [currentFolderId] — it means "the
+    /// tree root", the same convention DesktopFolderWatchRequested(null)
+    /// uses. Passing `currentFolderId: null` can't express that on its
+    /// own, because it's indistinguishable from omitting the argument, so
+    /// navigating back to the root silently kept the old folder id. Set
+    /// this flag to clear it instead.
+    bool clearCurrentFolderId = false,
     List<FileItem>? items,
     Set<String>? selectedItemIds,
     String? wallpaperAssetPath,
     bool? isLoading,
   }) {
     return DesktopState(
-      currentFolderId: currentFolderId ?? this.currentFolderId,
+      currentFolderId: clearCurrentFolderId
+          ? null
+          : (currentFolderId ?? this.currentFolderId),
       items: items ?? this.items,
       selectedItemIds: selectedItemIds ?? this.selectedItemIds,
       wallpaperAssetPath: wallpaperAssetPath ?? this.wallpaperAssetPath,

@@ -261,7 +261,10 @@ more):
   `shared/widgets/file_item_drop.dart` is the one path every drop target goes
   through, within a tree or across. Nothing moves optimistically, so Cancel
   leaves the item where it was. The only drop that doesn't ask is a reorder
-  within the same folder, since nothing changes location.
+  within the same folder, since nothing changes location. Moves and pastes
+  say how they ended, with a progress message first when they run long
+  (`runWithProgressFeedback` in `shared/widgets/operation_feedback.dart`) —
+  a large copy can still be working well after the dialog has closed.
 - Recursive folder copy is intentionally unsupported (`pasteClipboardItem`) —
   this is a deliberate scope cut, not a bug.
 

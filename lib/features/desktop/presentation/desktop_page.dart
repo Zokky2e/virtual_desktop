@@ -160,6 +160,7 @@ class DesktopPage extends StatelessWidget {
                           context: context,
                           clipboard: clipboard,
                           destinationFolderId: null,
+                          destinationFolderName: 'Desktop',
                         );
                       }
                     },

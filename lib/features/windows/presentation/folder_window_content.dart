@@ -393,6 +393,7 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                                 context: context,
                                 clipboard: clipboard,
                                 destinationFolderId: _currentFolder.id,
+                                destinationFolderName: _currentFolder.name,
                                 fileSystemRepository: _repo,
                                 storageService: _storage,
                                 isSharedDestination: widget.isShared,

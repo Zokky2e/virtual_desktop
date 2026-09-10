@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_cubit.dart';
 import 'package:virtual_desktop/features/file-system/clipboard/file_clipboard_state.dart';
 import 'package:virtual_desktop/features/windows/bloc/window_bloc.dart';
@@ -8,10 +9,12 @@ import 'package:virtual_desktop/shared/utils/browser_download.dart';
 import 'package:virtual_desktop/shared/utils/mime_utils.dart';
 import '../../core/constants.dart';
 import '../../core/di/injector.dart';
+import '../../core/error/failure.dart';
 import '../../core/models/file_item.dart';
 import '../../core/repositories/file_system_repository.dart';
 import '../../core/repositories/file_transfer_repository.dart';
 import '../../core/services/storage_service.dart';
+import 'operation_feedback.dart';
 
 /// Whether moving [item] into a view whose shared-ness is
 /// [isSharedDestination] would cross between the two trees.
@@ -92,16 +95,13 @@ Future<void> _downloadItem(
   if (storageKey == null) return;
 
   final result = await storage.downloadFile(storageKey);
-  await result.match(
-    (failure) async {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: ${failure.message}')),
-        );
-      }
-    },
-    (bytes) => triggerBrowserDownload(bytes, item.name),
-  );
+  await result.match((failure) async {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: ${failure.message}')),
+      );
+    }
+  }, (bytes) => triggerBrowserDownload(bytes, item.name));
 }
 
 Future<void> _showRenameDialog(
@@ -208,9 +208,7 @@ Future<String> _resolveCopyName({
 /// pasting twice yields "report (copy).pdf" exactly as a within-tree
 /// paste does. A cut keeps the item's own name; the server 409s on a
 /// clash, and that message is surfaced.
-Future<void> _pasteAcrossTrees({
-  required BuildContext context,
-  required FileClipboardCubit clipboard,
+Future<Either<Failure, Unit>> _pasteAcrossTrees({
   required FileItem item,
   required bool isCut,
   required String? destinationFolderId,
@@ -235,23 +233,56 @@ Future<void> _pasteAcrossTrees({
     mode: isCut ? FileTransferMode.move : FileTransferMode.copy,
     name: resolvedName,
   );
+  return result.map((_) => unit);
+}
 
-  result.match(
-    (failure) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${isCut ? 'Move' : 'Copy'} failed: ${failure.message}',
-            ),
-          ),
-        );
-      }
-    },
-    (_) {
-      // Cut is consumed by pasting; copy stays on the clipboard so it can
-      // be pasted again — same as the within-tree behaviour.
-      if (isCut) clipboard.clear();
+/// Copy inside one tree. The bytes come down to the client and go back up
+/// under a name that doesn't clash, which is why a large file takes a
+/// while.
+Future<Either<Failure, Unit>> _copyWithinTree({
+  required FileItem item,
+  required String? destinationFolderId,
+  required FileSystemRepository repo,
+  required StorageService storage,
+}) async {
+  final resolvedName = await _resolveCopyName(
+    repo: repo,
+    ownerId: item.ownerId,
+    parentFolderId: destinationFolderId,
+    baseName: item.name,
+  );
+
+  final downloaded = await storage.downloadFile(item.storageKey!);
+  return downloaded.match<Future<Either<Failure, Unit>>>(
+    (failure) async => Left(failure),
+    (bytes) async {
+      // fileName and parentFolderId are what the API provider's upload
+      // endpoint actually reads — it creates the tree record together with
+      // the bytes. Omitting them sent a null parent and let the service
+      // fall back to the tail of a caller-built path, so the copy landed
+      // at the root of the tree named `1712345678901_report.pdf` and the
+      // resolvedName de-duplication above was thrown away.
+      final uploaded = await storage.uploadFile(
+        bytes: bytes,
+        fileName: resolvedName,
+        mimeType: mimeTypeForFileName(resolvedName),
+        ownerId: item.ownerId,
+        parentFolderId: destinationFolderId,
+      );
+      return uploaded.match<Future<Either<Failure, Unit>>>(
+        (failure) async => Left(failure),
+        (path) async {
+          final created = await repo.createFile(
+            name: resolvedName,
+            parentFolderId: destinationFolderId,
+            ownerId: item.ownerId,
+            type: item.type,
+            storageKey: path,
+            size: bytes.length,
+          );
+          return created.map((_) => unit);
+        },
+      );
     },
   );
 }
@@ -260,6 +291,10 @@ Future<void> pasteClipboardItem({
   required BuildContext context,
   required FileClipboardCubit clipboard,
   required String? destinationFolderId,
+
+  /// Display name of the destination, for the progress and outcome
+  /// messages. Without it they leave the destination out.
+  String? destinationFolderName,
 
   /// Repository/service the paste operation runs against. Defaults to
   /// the personal-tree instances when null.
@@ -280,98 +315,66 @@ Future<void> pasteClipboardItem({
   if (clipboardState.isEmpty) return;
 
   final item = clipboardState.item!;
+  final isCut = clipboardState.mode == ClipboardMode.cut;
+  final crossesTrees = isCrossTreeTransfer(
+    item: item,
+    isSharedDestination: isSharedDestination,
+  );
 
   final repo = fileSystemRepository ?? getIt<FileSystemRepository>();
   final storage = storageService ?? getIt<StorageService>();
+  final messenger = ScaffoldMessenger.maybeOf(context);
 
-  if (isCrossTreeTransfer(item: item, isSharedDestination: isSharedDestination)) {
-    await _pasteAcrossTrees(
-      context: context,
-      clipboard: clipboard,
+  final Future<Either<Failure, Unit>> Function() operation;
+  if (crossesTrees) {
+    final transfers = transferRepository ?? getIt<FileTransferRepository>();
+    operation = () => _pasteAcrossTrees(
       item: item,
-      isCut: clipboardState.mode == ClipboardMode.cut,
+      isCut: isCut,
       destinationFolderId: destinationFolderId,
       isSharedDestination: isSharedDestination,
       destinationRepo: repo,
-      transferRepository: transferRepository ?? getIt<FileTransferRepository>(),
+      transferRepository: transfers,
     );
-    return;
-  }
-
-  if (clipboardState.mode == ClipboardMode.cut) {
+  } else if (isCut) {
     // Pasting into the same folder it's already in is a no-op.
     if (item.parentFolderId == destinationFolderId) {
       clipboard.clear();
       return;
     }
-    await repo.move(item.id, destinationFolderId);
-    clipboard.clear();
-    return;
-  }
-
-  // Copy mode — folders still aren't duplicated recursively (see
-  // original docstring); this applies equally to the shared tree.
-  if (item.isFolder) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    operation = () => repo.move(item.id, destinationFolderId);
+  } else {
+    // Copy mode — folders still aren't duplicated recursively (see
+    // original docstring); this applies equally to the shared tree.
+    if (item.isFolder) {
+      messenger?.showSnackBar(
         const SnackBar(
           content: Text('Copying folders isn\'t supported yet — only files.'),
         ),
       );
+      return;
     }
-    return;
+    operation = () => _copyWithinTree(
+      item: item,
+      destinationFolderId: destinationFolderId,
+      repo: repo,
+      storage: storage,
+    );
   }
 
-  final resolvedName = await _resolveCopyName(
-    repo: repo,
-    ownerId: item.ownerId,
-    parentFolderId: destinationFolderId,
-    baseName: item.name,
+  final label = destinationFolderName == null
+      ? item.name
+      : '${item.name} to $destinationFolderName';
+  final result = await runWithProgressFeedback<Unit>(
+    messenger: messenger,
+    inProgress: '${isCut ? 'Moving' : 'Copying'} $label…',
+    succeeded: '${isCut ? 'Moved' : 'Copied'} $label',
+    failurePrefix: isCut ? 'Move failed' : 'Copy failed',
+    operation: operation,
   );
 
-  final downloadResult = await storage.downloadFile(item.storageKey!);
-
-  await downloadResult.match(
-    (failure) async {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Copy failed: ${failure.message}')),
-        );
-      }
-    },
-    (bytes) async {
-      // fileName and parentFolderId are what the API provider's upload
-      // endpoint actually reads — it creates the tree record together with
-      // the bytes. Omitting them sent a null parent and let the service
-      // fall back to the tail of a caller-built path, so the copy landed
-      // at the root of the tree named `1712345678901_report.pdf` and the
-      // resolvedName de-duplication above was thrown away.
-      final uploadResult = await storage.uploadFile(
-        bytes: bytes,
-        fileName: resolvedName,
-        mimeType: mimeTypeForFileName(resolvedName),
-        ownerId: item.ownerId,
-        parentFolderId: destinationFolderId,
-      );
-      await uploadResult.match(
-        (failure) async {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Copy failed: ${failure.message}')),
-            );
-          }
-        },
-        (path) async {
-          await repo.createFile(
-            name: resolvedName,
-            parentFolderId: destinationFolderId,
-            ownerId: item.ownerId,
-            type: item.type,
-            storageKey: path,
-            size: bytes.length,
-          );
-        },
-      );
-    },
-  );
+  // Cut is consumed by a paste that worked; copy stays on the clipboard so
+  // it can be pasted again. A cut that failed stays too, so it can be
+  // retried rather than silently dropped.
+  if (isCut && result.isRight()) clipboard.clear();
 }

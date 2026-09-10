@@ -7,6 +7,7 @@ import '../../core/models/file_item.dart';
 import '../../core/repositories/file_system_repository.dart';
 import '../../core/repositories/file_transfer_repository.dart';
 import 'file_item_actions.dart';
+import 'operation_feedback.dart';
 
 /// What a file or folder icon carries while it is being dragged.
 ///
@@ -48,7 +49,8 @@ bool isAlreadyInFolder({
 /// shared trees — and nothing is sent until the user says so. Nothing moves
 /// optimistically either: the icon never left its place (what followed the
 /// pointer was only drag feedback), so Cancel leaves the item exactly where
-/// it was.
+/// it was. Once confirmed, the user is told how the move ended, with a
+/// progress message first if it runs long — see [runWithProgressFeedback].
 ///
 /// A drop onto the folder the item is already in isn't a move, and returns
 /// without asking. Reordering within a folder is the caller's to handle
@@ -79,6 +81,10 @@ Future<void> confirmAndMoveDroppedItem({
     return;
   }
 
+  // Looked up before the first await: the window that took the drop can be
+  // closed before a long move finishes, but the messenger stays.
+  final messenger = ScaffoldMessenger.maybeOf(context);
+
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -99,24 +105,29 @@ Future<void> confirmAndMoveDroppedItem({
   // Dismissing the dialog — Escape, a click outside it — is a Cancel too.
   if (confirmed != true) return;
 
-  final Either<Failure, Object> result =
-      isCrossTreeTransfer(item: item, isSharedDestination: isSharedDestination)
-      ? await (transferRepository ?? getIt<FileTransferRepository>()).transfer(
-          itemId: item.id,
-          fromShared: item.ownerId == sharedOwnerId,
-          toShared: isSharedDestination,
-          destinationParentFolderId: destinationFolderId,
-          mode: FileTransferMode.move,
-        )
-      : await fileSystemRepository.move(item.id, destinationFolderId);
-
-  result.match((failure) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Move failed: ${failure.message}')),
+  Future<Either<Failure, Object>> move() async {
+    if (isCrossTreeTransfer(
+      item: item,
+      isSharedDestination: isSharedDestination,
+    )) {
+      return (transferRepository ?? getIt<FileTransferRepository>()).transfer(
+        itemId: item.id,
+        fromShared: item.ownerId == sharedOwnerId,
+        toShared: isSharedDestination,
+        destinationParentFolderId: destinationFolderId,
+        mode: FileTransferMode.move,
       );
     }
-  }, (_) {});
+    return fileSystemRepository.move(item.id, destinationFolderId);
+  }
+
+  await runWithProgressFeedback<Object>(
+    messenger: messenger,
+    inProgress: 'Moving ${item.name} to $destinationFolderName…',
+    succeeded: 'Moved ${item.name} to $destinationFolderName',
+    failurePrefix: 'Move failed',
+    operation: move,
+  );
 }
 
 TextSpan _moveQuestion(DraggedFileItem dragged, String destinationFolderName) {

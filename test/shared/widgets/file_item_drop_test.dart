@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -8,6 +10,7 @@ import 'package:virtual_desktop/core/models/file_item.dart';
 import 'package:virtual_desktop/core/repositories/file_system_repository.dart';
 import 'package:virtual_desktop/core/repositories/file_transfer_repository.dart';
 import 'package:virtual_desktop/shared/widgets/file_item_drop.dart';
+import 'package:virtual_desktop/shared/widgets/operation_feedback.dart';
 
 class _MockFileSystemRepository extends Mock implements FileSystemRepository {}
 
@@ -247,6 +250,42 @@ void main() {
     );
 
     expect(find.text('Move report.pdf to Projects?'), findsOneWidget);
+  });
+
+  testWidgets('says when the move is done', (tester) async {
+    await drop(
+      tester,
+      item: _report(ownerId: _uid),
+      destinationFolderId: 'projects-id',
+    );
+    await tester.tap(find.text('Move'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Moved report.pdf to Projects'), findsOneWidget);
+  });
+
+  testWidgets('a slow move says it is underway until it is done', (
+    tester,
+  ) async {
+    final finished = Completer<Either<Failure, Unit>>();
+    when(() => repo.move(any(), any())).thenAnswer((_) => finished.future);
+    await drop(
+      tester,
+      item: _report(ownerId: _uid),
+      destinationFolderId: 'projects-id',
+    );
+    await tester.tap(find.text('Move'));
+    await tester.pump(progressFeedbackDelay);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Moving report.pdf to Projects…'), findsOneWidget);
+    expect(find.text('Moved report.pdf to Projects'), findsNothing);
+
+    finished.complete(const Right(unit));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Moving report.pdf to Projects…'), findsNothing);
+    expect(find.text('Moved report.pdf to Projects'), findsOneWidget);
   });
 
   testWidgets('a failed move says why', (tester) async {

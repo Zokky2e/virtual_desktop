@@ -29,17 +29,15 @@ class LocalWallpaperStorageService implements StorageService {
   @override
   Future<Either<Failure, String>> uploadFile({
     required Uint8List bytes,
-    required String path,
+    required String fileName,
     required String mimeType,
+    required String ownerId,
     String? parentFolderId,
-    String? fileName,
     void Function(double progress)? onProgress,
-    bool isShared = false,
   }) async {
     try {
       final dir = await _wallpapersDir();
-      final name = fileName ?? path.split('/').last;
-      final storedName = '${_uuid.v4()}${p.extension(name)}';
+      final storedName = '${_uuid.v4()}${p.extension(fileName)}';
       final file = File(p.join(dir.path, storedName));
       await file.writeAsBytes(bytes);
       onProgress?.call(1.0);

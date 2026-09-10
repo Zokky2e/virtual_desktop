@@ -53,7 +53,7 @@ GoRouter buildRouter(AuthBloc authBloc) {
       ),
       GoRoute(
         path: AppRoutes.loading,
-        builder: (_, __) =>
+        builder: (_, _) =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
     ],

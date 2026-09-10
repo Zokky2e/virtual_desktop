@@ -21,7 +21,6 @@ class FilesApi {
     required String mimeType,
     required String? parentFolderId,
     void Function(double progress)? onProgress,
-    bool isShared = false,
   }) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(
@@ -33,10 +32,12 @@ class FilesApi {
     final res = await _client.dio.post(
       '$basePath/upload',
       data: formData,
-      queryParameters: {
-        'parent_folder_id': ?parentFolderId,
-        'isShared': isShared,
-      },
+      // No isShared: the shared tree is reached by resolving the
+      // 'shared' registration, whose basePath already points at
+      // /desktop/shared. Passing it here was a way to write into the
+      // shared tree through the personal route, which is exactly what the
+      // backend's own shared.py exists to avoid.
+      queryParameters: {'parent_folder_id': ?parentFolderId},
       onSendProgress: (sent, total) {
         if (total > 0 && onProgress != null) onProgress(sent / total);
       },

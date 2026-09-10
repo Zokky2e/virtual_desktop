@@ -29,8 +29,10 @@ class _ResizeHandleState extends State<ResizeHandle> {
           _sizeAtDragStart = window.size;
         },
         onPanUpdate: (details) {
-          if (_dragStartGlobalPosition == null || _sizeAtDragStart == null)
+          if (_dragStartGlobalPosition == null ||
+              _sizeAtDragStart == null) {
             return;
+          }
           final totalDelta = details.globalPosition - _dragStartGlobalPosition!;
           final newSize = Size(
             _sizeAtDragStart!.width + totalDelta.dx,

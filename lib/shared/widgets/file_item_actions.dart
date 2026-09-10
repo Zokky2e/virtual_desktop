@@ -228,21 +228,18 @@ Future<void> pasteClipboardItem({
       }
     },
     (bytes) async {
-      final newStorageKey =
-          'users/${item.ownerId}/${DateTime.now().millisecondsSinceEpoch}_$resolvedName';
-      // parentFolderId and fileName are what the API provider's upload
+      // fileName and parentFolderId are what the API provider's upload
       // endpoint actually reads — it creates the tree record together with
       // the bytes. Omitting them sent a null parent and let the service
-      // fall back to `path.split('/').last`, so the copy landed at the root
-      // of the tree named `1712345678901_report.pdf` and the resolvedName
-      // de-duplication above was computed and then thrown away.
+      // fall back to the tail of a caller-built path, so the copy landed
+      // at the root of the tree named `1712345678901_report.pdf` and the
+      // resolvedName de-duplication above was thrown away.
       final uploadResult = await storage.uploadFile(
         bytes: bytes,
-        path: newStorageKey,
-        mimeType: mimeTypeForFileName(resolvedName),
-        parentFolderId: destinationFolderId,
         fileName: resolvedName,
-        isShared: isSharedDestination,
+        mimeType: mimeTypeForFileName(resolvedName),
+        ownerId: item.ownerId,
+        parentFolderId: destinationFolderId,
       );
       await uploadResult.match(
         (failure) async {

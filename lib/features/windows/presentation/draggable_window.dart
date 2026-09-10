@@ -72,8 +72,10 @@ class _TitleBarState extends State<_TitleBar> {
         _positionAtDragStart = window.position;
       },
       onPanUpdate: (details) {
-        if (_dragStartGlobalPosition == null || _positionAtDragStart == null)
+        if (_dragStartGlobalPosition == null ||
+            _positionAtDragStart == null) {
           return;
+        }
         final totalDelta = details.globalPosition - _dragStartGlobalPosition!;
         context.read<WindowBloc>().add(
           WindowMovedTo(window.id, _positionAtDragStart! + totalDelta),

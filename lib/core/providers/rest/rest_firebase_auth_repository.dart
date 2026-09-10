@@ -12,7 +12,7 @@ import '../../repositories/auth_repository.dart';
 /// has no official desktop support (see
 /// Windows-Desktop-Video-Player-VLC-Plan.md's "Related, larger blocker").
 /// Same public contract as FirebaseAuthRepository, so AuthBloc/router
-/// never know which one is behind getIt<AuthRepository>().
+/// never know which one is behind `getIt<AuthRepository>()`.
 ///
 /// Tokens persist via SharedPreferences so a session survives restarts.
 /// SharedPreferences is plaintext on disk — fine for a self-hosted single-

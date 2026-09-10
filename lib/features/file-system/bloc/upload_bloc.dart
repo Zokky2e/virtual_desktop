@@ -40,17 +40,18 @@ class UploadBloc extends Bloc<UploadEvent, UploadState> {
 
     emit(const UploadInProgress(0));
 
-    final storageKey =
-        'users/$uid/${DateTime.now().millisecondsSinceEpoch}_${event.fileName}';
-
+    // No storage key is built here any more: the key layout is the
+    // storage provider's business, and the one this bloc used to invent
+    // was ignored by the active provider except as a filename fallback.
+    // Which tree this lands in is already settled by which registration
+    // was injected, so no isShared flag either.
     final uploadResult = await _storageService.uploadFile(
       bytes: event.bytes,
-      path: storageKey,
-      mimeType: event.mimeType,
-      parentFolderId: event.parentFolderId,
       fileName: event.fileName,
+      mimeType: event.mimeType,
+      ownerId: uid,
+      parentFolderId: event.parentFolderId,
       onProgress: (progress) => emit(UploadInProgress(progress)),
-      isShared: event.isShared,
     );
 
     await uploadResult.match(

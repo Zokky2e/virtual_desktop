@@ -25,21 +25,19 @@ class ApiStorageService implements StorageService {
   @override
   Future<Either<Failure, String>> uploadFile({
     required Uint8List bytes,
-    required String path,
+    required String fileName,
     required String mimeType,
+    required String ownerId,
     String? parentFolderId,
-    String? fileName,
     void Function(double progress)? onProgress,
-    bool isShared = false,
   }) async {
     try {
       final json = await _filesApi.upload(
         bytes: bytes,
-        fileName: fileName ?? path.split('/').last,
+        fileName: fileName,
         mimeType: mimeType,
         parentFolderId: parentFolderId,
         onProgress: onProgress,
-        isShared: isShared,
       );
       return Right(json['id'] as String);
     } catch (e) {

@@ -31,24 +31,22 @@ class ApiWallpaperStorageService implements StorageService {
   /// ApiWallpaperRepository.saveWallpaper treats as [storageKey] and
   /// fetches rather than re-creating.
   ///
-  /// [path], [parentFolderId] and [isShared] are all ignored: wallpapers
-  /// have no folder tree to be placed in and no shared variant. [path] is
-  /// only consulted as a last-resort source of a filename, matching
-  /// ApiStorageService.
+  /// [ownerId] and [parentFolderId] are both ignored: the server scopes
+  /// wallpapers to the bearer token's uid, and a wallpaper has no folder
+  /// tree to be placed in.
   @override
   Future<Either<Failure, String>> uploadFile({
     required Uint8List bytes,
-    required String path,
+    required String fileName,
     required String mimeType,
+    required String ownerId,
     String? parentFolderId,
-    String? fileName,
     void Function(double progress)? onProgress,
-    bool isShared = false,
   }) async {
     try {
       final json = await _api.upload(
         bytes: bytes,
-        fileName: fileName ?? path.split('/').last,
+        fileName: fileName,
         mimeType: mimeType,
         onProgress: onProgress,
       );

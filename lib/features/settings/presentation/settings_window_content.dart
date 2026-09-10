@@ -9,7 +9,6 @@ import '../../../core/models/app_settings.dart';
 import '../../../core/repositories/auth_repository.dart';
 import '../../../core/repositories/wallpaper_repository.dart';
 import '../../../core/services/storage_service.dart';
-import '../../../shared/utils/mime_utils.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_event.dart';
 import '../bloc/settings_state.dart';
@@ -29,8 +28,6 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
     0xFF1B3A2F, // dark green
     0xFF2A1E38, // dark purple
   ];
-
-  bool _isUploadingWallpaper = false;
 
   Future<void> _openCustomColorPicker(
     BuildContext context,
@@ -63,148 +60,51 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
     );
     if (confirmed == true && context.mounted) {
       context.read<SettingsBloc>().add(
-        SettingsWallpaperColorChanged(picked.value),
+        SettingsWallpaperColorChanged(picked.toARGB32()),
       );
     }
   }
 
+  /// Picks a file and hands it to SettingsBloc. Everything after this —
+  /// dedupe, upload, save, select, resolve URL — is the bloc's job now;
+  /// this method used to run that five-call sequence itself.
   Future<void> _uploadCustomWallpaper(BuildContext context) async {
     final result = await FilePicker.platform.pickFiles(
       withData: true,
       type: FileType.image,
     );
     final file = result?.files.single;
-    if (file?.bytes == null) return;
+    if (file?.bytes == null || !context.mounted) return;
 
-    final uid = getIt<AuthRepository>().currentUser?.uid;
-    if (uid == null || !context.mounted) return;
-
-    setState(() => _isUploadingWallpaper = true);
-
-    final wallpaperRepository = getIt<WallpaperRepository>(
-      instanceName: wallpaperInstanceName,
-    );
-    final storageService = getIt<StorageService>(
-      instanceName: wallpaperInstanceName,
-    );
-
-    // Dedupe check first — avoid re-uploading a file we already have
-    // saved under the "wallpapers" collection for this user.
-    final existingResult = await wallpaperRepository.findExisting(
-      ownerId: uid,
-      name: file!.name,
-      size: file.bytes!.length,
-    );
-
-    final existing = existingResult.getOrElse((_) => null);
-    if (existing != null) {
-      final urlResult = await storageService.getDownloadUrl(
-        existing.storageKey!,
-      );
-      if (!context.mounted) return;
-      setState(() => _isUploadingWallpaper = false);
-      urlResult.match(
-        (failure) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not load wallpaper: ${failure.message}'),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
-          ),
-        ),
-        (url) {
-          context.read<SettingsBloc>().add(SettingsWallpaperImageChanged(url));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Reused previously uploaded wallpaper'),
-              behavior: SnackBarBehavior.floating,
-              margin: EdgeInsets.only(left: 16, right: 16, bottom: 64),
-            ),
-          );
-        },
-      );
-      return;
-    }
-
-    // No match — upload fresh, then record it in the wallpapers collection
-    // so it shows up in the gallery and can be deduped against next time.
-    final storageKey =
-        'users/$uid/wallpaper/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-
-    final uploadResult = await storageService.uploadFile(
-      bytes: file.bytes!,
-      path: storageKey,
-      mimeType: mimeTypeForFileName(file.name),
-    );
-
-    if (!context.mounted) return;
-
-    await uploadResult.match(
-      (failure) async {
-        setState(() => _isUploadingWallpaper = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Wallpaper upload failed: ${failure.message}'),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
-          ),
-        );
-      },
-      (path) async {
-        final saveResult = await wallpaperRepository.saveWallpaper(
-          name: file.name,
-          ownerId: uid,
-          storageKey: path,
-          size: file.bytes!.length,
-        );
-        saveResult.match(
-          (failure) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Could not save wallpaper record: ${failure.message}',
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 64,
-                  ),
-                ),
-              );
-            }
-          },
-          (onRight) async {
-            await wallpaperRepository.updateWallpaper(
-              itemId: onRight.id,
-              ownerId: uid,
-            );
-          }, // success — nothing extra to do, gallery stream picks it up automatically
-        );
-        final urlResult = await storageService.getDownloadUrl(path);
-        if (!context.mounted) return;
-        setState(() => _isUploadingWallpaper = false);
-        urlResult.match(
-          (failure) => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Could not load uploaded wallpaper: ${failure.message}',
-              ),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
-            ),
-          ),
-          (url) => context.read<SettingsBloc>().add(
-            SettingsWallpaperImageChanged(url),
-          ),
-        );
-      },
+    context.read<SettingsBloc>().add(
+      SettingsWallpaperUploadRequested(
+        bytes: file!.bytes!,
+        fileName: file.name,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SettingsBloc, SettingsState>(
+    // The bloc raises one-shot notices (upload failures, "reused existing")
+    // that used to be SnackBars fired from inside the workflow method.
+    // listenWhen keys on noticeId so two identical messages in a row still
+    // show twice.
+    return BlocConsumer<SettingsBloc, SettingsState>(
+      listenWhen: (previous, current) =>
+          current is SettingsLoaded &&
+          current.notice != null &&
+          (previous is! SettingsLoaded ||
+              previous.noticeId != current.noticeId),
+      listener: (context, state) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text((state as SettingsLoaded).notice!),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 64),
+          ),
+        );
+      },
       builder: (context, state) {
         if (state is! SettingsLoaded) {
           return const Center(child: CircularProgressIndicator());
@@ -357,11 +257,11 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onPrimary,
                           ),
-                          _isUploadingWallpaper
+                          state.isUploadingWallpaper
                               ? 'Uploading...'
                               : 'Replace Image',
                         ),
-                        onPressed: _isUploadingWallpaper
+                        onPressed: state.isUploadingWallpaper
                             ? null
                             : () => _uploadCustomWallpaper(context),
                       ),
@@ -390,11 +290,11 @@ class _SettingsWindowContentState extends State<SettingsWindowContent> {
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimary,
                     ),
-                    _isUploadingWallpaper
+                    state.isUploadingWallpaper
                         ? 'Uploading...'
                         : 'Upload Custom Image',
                   ),
-                  onPressed: _isUploadingWallpaper
+                  onPressed: state.isUploadingWallpaper
                       ? null
                       : () => _uploadCustomWallpaper(context),
                 ),
@@ -497,7 +397,7 @@ class _WallpaperGalleryState extends State<_WallpaperGallery> {
           return ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: wallpapers.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, index) =>
                 _WallpaperThumbnail(item: wallpapers[index]),
           );
@@ -542,16 +442,11 @@ class _WallpaperThumbnailState extends State<_WallpaperThumbnail> {
       );
     }
     return GestureDetector(
-      onTap: () {
-        context.read<SettingsBloc>().add(SettingsWallpaperImageChanged(_url!));
-        final wallpaperRepository = getIt<WallpaperRepository>(
-          instanceName: wallpaperInstanceName,
-        );
-        wallpaperRepository.updateWallpaper(
-          itemId: widget.item.id,
-          ownerId: widget.item.ownerId,
-        );
-      },
+      // One event: the bloc marks the wallpaper active and applies its
+      // URL, so this path and the upload path can't drift apart.
+      onTap: () => context.read<SettingsBloc>().add(
+        SettingsWallpaperSelected(widget.item),
+      ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: Image(

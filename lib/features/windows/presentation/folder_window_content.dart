@@ -347,6 +347,9 @@ class _FolderWindowContentState extends State<FolderWindowContent> {
                                   ),
                               ],
                             );
+                            // showMenu was awaited above — the window
+                            // can have been closed while it was open.
+                            if (!context.mounted) return;
                             if (selection == 'new_folder') _createFolder();
                             if (selection == 'upload') _uploadFile();
                             if (selection == 'paste') {

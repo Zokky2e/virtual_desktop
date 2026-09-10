@@ -9,24 +9,17 @@ class FakeStorageService implements StorageService {
   @override
   Future<Either<Failure, String>> uploadFile({
     required Uint8List bytes,
-    required String path,
+    required String fileName,
     required String mimeType,
-
-    /// Only used by providers whose upload endpoint creates the file-tree
-    /// record atomically with the bytes (e.g. the API provider). Firebase
-    /// ignores this — its metadata record is created separately by
-    /// FileSystemRepository.createFile, after upload returns.
+    required String ownerId,
     String? parentFolderId,
-
-    /// Same story as [parentFolderId] — ignored by providers that don't
-    /// need it.
-    String? fileName,
     void Function(double progress)? onProgress,
-    bool isShared = false,
   }) async {
     onProgress?.call(1.0);
-    _store[path] = bytes;
-    return Right(path);
+    final storageKey =
+        'users/$ownerId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+    _store[storageKey] = bytes;
+    return Right(storageKey);
   }
 
   @override

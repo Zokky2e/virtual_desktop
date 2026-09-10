@@ -13,15 +13,18 @@ class FirebaseStorageService implements StorageService {
   @override
   Future<Either<Failure, String>> uploadFile({
     required Uint8List bytes,
-    required String path,
+    required String fileName,
     required String mimeType,
+    required String ownerId,
     String? parentFolderId,
-    String? fileName,
     void Function(double progress)? onProgress,
-    bool isShared = false,
   }) async {
     try {
-      final ref = _storage.ref(path);
+      // This provider owns its own key layout — owner-scoped so it
+      // lines up with the usual Firebase Storage security rules.
+      final storageKey =
+          'users/$ownerId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      final ref = _storage.ref(storageKey);
       final task = ref.putData(
         bytes,
         fb.SettableMetadata(contentType: mimeType),
@@ -36,7 +39,7 @@ class FirebaseStorageService implements StorageService {
       }
 
       await task;
-      return Right(path);
+      return Right(storageKey);
     } on fb.FirebaseException catch (e) {
       return Left(StorageFailure(e.message ?? 'Upload failed.'));
     } catch (e) {

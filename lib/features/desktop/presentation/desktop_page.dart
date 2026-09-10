@@ -143,6 +143,10 @@ class DesktopPage extends StatelessWidget {
                         ],
                       );
 
+                      // showMenu was awaited above — the desktop can
+                      // have been torn down while it was open.
+                      if (!context.mounted) return;
+
                       if (selection == 'new_folder') {
                         addNewFolder(context);
                       }
